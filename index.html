@@ -103,16 +103,22 @@
       
       <div id="stageContainer" class="relative bg-slate-950 w-full aspect-square overflow-hidden group touch-none">
         
-        <label id="uploadPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-3 cursor-pointer p-6 text-center hover:bg-slate-900/50 transition z-50">
-          <div class="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-brand-300 shadow-inner">
+        <div id="uploadPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center z-50">
+          <label class="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-brand-300 shadow-inner cursor-pointer hover:bg-slate-700 transition active:scale-95">
             <i data-lucide="image-plus" class="w-7 h-7"></i>
-          </div>
+            <input type="file" id="imageInput" accept="image/*" class="hidden">
+          </label>
+          
           <div>
-            <p class="text-sm font-semibold text-slate-200">點擊上傳照片</p>
-            <p class="text-xs text-slate-500 mt-1">支援文字 3D 動態穿透進場與角度旋轉</p>
+            <label for="imageInput" class="text-sm font-semibold text-slate-200 cursor-pointer hover:underline block">點擊上傳照片</label>
+            <p class="text-xs text-slate-500 mt-1">支援 3D 動態文字穿透與角度旋轉</p>
           </div>
-          <input type="file" id="imageInput" accept="image/*" class="hidden">
-        </label>
+
+          <button onclick="pasteFromClipboard()" class="mt-1 flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-brand-300 font-medium text-xs rounded-xl shadow-md active:scale-95 transition">
+            <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
+            <span>從剪貼板貼上</span>
+          </button>
+        </div>
 
         <div id="aiLoadingMask" class="absolute inset-0 bg-slate-950/80 backdrop-blur-md hidden flex-col items-center justify-center gap-3 z-50">
           <div class="w-10 h-10 border-4 border-brand-300/20 border-t-brand-300 rounded-full animate-spin"></div>
@@ -349,7 +355,6 @@
       textRotationDeg: 0
     };
 
-    // 精確字型對應表，確保 Canvas 能識別正確的字型名稱
     const fontMap = {
       'font-sans': '"Noto Sans TC", sans-serif',
       'font-serif': '"Noto Serif TC", serif',
@@ -402,6 +407,9 @@
       btnRemoveImage.addEventListener('click', removeImage);
       
       document.getElementById('btnReset').addEventListener('click', resetAll);
+
+      // 監聽鍵盤 Ctrl+V / Cmd+V 貼上圖片事件
+      window.addEventListener('paste', handleGlobalPaste);
 
       initAISegmentation();
       initInteractionEngine();
@@ -521,9 +529,8 @@
       });
     }
 
-    async function handleImageUpload(e) {
-      const file = e.target.files[0];
-      if (!file) return;
+    async function handleImageFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
 
       const img = await compressAndLoadImage(file, 2048);
       state.currentImgElement = img;
@@ -536,6 +543,50 @@
       imageOverlayControls.classList.add('flex');
 
       await processAIPrediction(img);
+    }
+
+    async function handleImageUpload(e) {
+      const file = e.target.files[0];
+      await handleImageFile(file);
+    }
+
+    // 從剪貼板讀取圖片並載入
+    async function pasteFromClipboard() {
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+          alert('您的瀏覽器不支援直接存取剪貼板，請使用 Ctrl+V / Cmd+V 或上傳照片。');
+          return;
+        }
+
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const file = new File([blob], 'clipboard_image.png', { type: imageType });
+            await handleImageFile(file);
+            return;
+          }
+        }
+        alert('剪貼板中找不到圖片，請先複製照片後再試！');
+      } catch (err) {
+        alert('讀取剪貼板失敗，請確認已授權瀏覽器剪貼板存取權限。');
+      }
+    }
+
+    // 全域鍵盤 Ctrl+V / Cmd+V 貼上監聽
+    async function handleGlobalPaste(e) {
+      if (!e.clipboardData || !e.clipboardData.items) return;
+      
+      const items = e.clipboardData.items;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          await handleImageFile(file);
+          e.preventDefault();
+          break;
+        }
+      }
     }
 
     function drawImgObjectCover(ctx, img, targetW, targetH) {
@@ -899,7 +950,6 @@
       const titleText = cardTitle.innerText.trim();
       const titleFontSize = Math.round(state.titleFontSize * scaleFactor * scale);
 
-      // 使用映射表獲取精確完整的 Font-Family 字型名稱
       const fontFamily = fontMap[state.currentFont] || '"Noto Sans TC", sans-serif';
       const lineHeight = titleFontSize * 1.1;
 
@@ -911,7 +961,6 @@
       ctx.shadowColor = 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = 12 * scaleFactor;
       
-      // 設定 Canvas 的精確字型
       ctx.font = `900 ${titleFontSize}px ${fontFamily}`;
       ctx.textBaseline = 'top';
 
@@ -992,7 +1041,6 @@
         return;
       }
 
-      // 確保字型預載入完成後才渲染預覽 Canvas
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
       }
