@@ -5,19 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>𓃥 白六照片主題編輯</title>
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Noto+Serif+TC:wght@700;900&family=Zhi+Mang+Xing&family=Dela+Gothic+One&display=swap" rel="stylesheet">
 
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
-  <!-- Canvas Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-  <!-- MediaPipe Selfie Segmentation -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
 
   <script>
@@ -83,7 +78,6 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
 
-  <!-- Header -->
   <header class="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
     <div class="flex items-center gap-2">
       <span class="text-xl font-bold bg-gradient-to-r from-brand-300 to-amber-200 bg-clip-text text-transparent flex items-center gap-1.5">
@@ -103,16 +97,12 @@
     </div>
   </header>
 
-  <!-- 主編輯區 -->
   <main class="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center justify-start gap-4">
 
-    <!-- 3D 景深卡片舞台 -->
     <div id="cardContainer" class="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-all duration-300">
       
-      <!-- Stage -->
       <div id="stageContainer" class="relative bg-slate-950 w-full aspect-square overflow-hidden group touch-none">
         
-        <!-- 上傳按鈕 (空狀態) -->
         <label id="uploadPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-3 cursor-pointer p-6 text-center hover:bg-slate-900/50 transition z-50">
           <div class="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-brand-300 shadow-inner">
             <i data-lucide="image-plus" class="w-7 h-7"></i>
@@ -124,37 +114,30 @@
           <input type="file" id="imageInput" accept="image/*" class="hidden">
         </label>
 
-        <!-- AI 運算處理中遮罩 -->
         <div id="aiLoadingMask" class="absolute inset-0 bg-slate-950/80 backdrop-blur-md hidden flex-col items-center justify-center gap-3 z-50">
           <div class="w-10 h-10 border-4 border-brand-300/20 border-t-brand-300 rounded-full animate-spin"></div>
           <p class="text-xs font-semibold text-brand-300">AI 正自動預判主體圖層中...</p>
         </div>
 
-        <!-- 【圖層 3：最底層】原始照片背景 (z-index: 0) -->
         <img id="layerBottom" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none z-0" alt="Full Image" />
 
-        <!-- 【圖層 2：中間層】文字圖層 (z-index: 10) -->
         <div 
           id="layerMiddleText" 
           class="absolute z-10 p-3 rounded-2xl bg-black/20 backdrop-blur-xs border border-white/20 shadow-2xl flex flex-col gap-1 active:border-brand-300 transition-all duration-75 drag-handle"
           style="top: 25px; left: 25px; width: 160px; min-width: 90px; max-width: 90%; --title-font-size: 42px; transform-origin: center center;"
         >
-          <!-- 左上：拖曳位移 -->
           <div id="dragHeader" class="drag-handle absolute -top-3 -left-3 w-7 h-7 rounded-full bg-brand-300 text-slate-950 flex items-center justify-center shadow-md cursor-move">
             <i data-lucide="move" class="w-3.5 h-3.5"></i>
           </div>
 
-          <!-- 右上：角度旋轉 -->
           <div id="rotateHandle" class="drag-handle absolute -top-3 -right-3 w-7 h-7 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing">
             <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
           </div>
 
-          <!-- 右側：調整寬度 -->
           <div id="widthHandle" class="drag-handle absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-md cursor-ew-resize">
             <i data-lucide="grip-vertical" class="w-3 h-3"></i>
           </div>
 
-          <!-- 右下：等比例字型大小縮放 -->
           <div id="scaleHandle" class="drag-handle absolute -bottom-2.5 -right-2.5 w-6 h-6 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-md cursor-se-resize">
             <i data-lucide="maximize-2" class="w-3 h-3"></i>
           </div>
@@ -167,15 +150,12 @@
           >早安</div>
         </div>
 
-        <!-- 【圖層 1：最上層前景主體 Canvas】 (z-index: 20) -->
         <canvas id="layerTopSubject" class="absolute inset-0 w-full h-full object-cover hidden z-20"></canvas>
 
-        <!-- 筆刷觸控指示器 -->
         <div id="brushCursor" class="absolute hidden rounded-full border-2 border-dashed border-yellow-300 bg-red-500/30 shadow-lg z-30 flex items-center justify-center transition-all duration-75">
           <div class="w-2 h-2 rounded-full bg-yellow-400"></div>
         </div>
 
-        <!-- 圖片控制項 -->
         <div id="imageOverlayControls" class="absolute top-3 left-3 hidden flex-col gap-2 z-40">
           <label class="p-2 rounded-xl bg-slate-900/80 backdrop-blur-md text-slate-200 hover:bg-slate-800 cursor-pointer shadow-lg border border-slate-700/50 active:scale-90 transition">
             <i data-lucide="refresh-cw" class="w-4 h-4"></i>
@@ -186,7 +166,6 @@
           </button>
         </div>
 
-        <!-- 提示標籤 -->
         <div id="eraserBadge" class="absolute top-3 right-3 hidden items-center gap-1.5 px-3 py-1 bg-red-500 text-white font-bold text-xs rounded-full shadow-lg backdrop-blur-md z-40 animate-pulse">
           <i id="modeBadgeIcon" data-lucide="eraser" class="w-3.5 h-3.5"></i>
           <span id="modeBadgeText">橡皮擦：擦除區域露出文字</span>
@@ -194,7 +173,6 @@
 
       </div>
 
-      <!-- 操作選單 -->
       <div class="px-4 py-3 bg-slate-950/90 border-t border-slate-800 flex flex-col gap-2.5">
         
         <div class="grid grid-cols-4 gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
@@ -286,7 +264,6 @@
 
   </main>
 
-  <!-- 底部選單 -->
   <div class="sticky bottom-0 z-30 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-4 py-3">
     <div class="w-full max-w-sm mx-auto flex items-center justify-around gap-2">
       
@@ -308,7 +285,6 @@
     </div>
   </div>
 
-  <!-- 【預覽成果 Modal (支援 3D 動態穿透、複製、分享與存檔)】 -->
   <div id="previewModal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex flex-col items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-3">
       <div class="flex items-center justify-between">
@@ -320,7 +296,6 @@
         </button>
       </div>
 
-      <!-- 進場模式選擇與播放控制按鈕 -->
       <div class="flex items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
         <select id="animTypeSelect" class="bg-slate-900 text-xs text-slate-200 border border-slate-700 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-brand-300 flex-1">
           <option value="top">從上向下滑入</option>
@@ -337,18 +312,15 @@
         </button>
       </div>
 
-      <!-- Canvas 預覽畫布 -->
       <div id="previewCanvasBox" class="w-full rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner relative">
         <canvas id="previewCanvas" class="w-full h-full object-contain"></canvas>
 
-        <!-- 錄影倒數提示 Overlay -->
         <div id="countdownOverlay" class="absolute inset-0 bg-slate-950/70 backdrop-blur-xs hidden flex-col items-center justify-center gap-2 z-30">
           <p class="text-xs font-semibold text-slate-300">請準備啟動螢幕錄影...</p>
           <span id="countdownNum" class="text-5xl font-black text-brand-300 animate-bounce">3</span>
         </div>
       </div>
 
-      <!-- 快捷匯出操作列（複製 / 分享/儲存） -->
       <div class="grid grid-cols-2 gap-2 pt-1">
         <button onclick="copyToClipboard()" class="py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition active:scale-95 flex items-center justify-center gap-1">
           <i data-lucide="copy" class="w-3.5 h-3.5 text-cyan-300"></i>
@@ -375,6 +347,14 @@
       currentColor: '#ffffff',
       titleFontSize: 42,
       textRotationDeg: 0
+    };
+
+    // 精確字型對應表，確保 Canvas 能識別正確的字型名稱
+    const fontMap = {
+      'font-sans': '"Noto Sans TC", sans-serif',
+      'font-serif': '"Noto Serif TC", serif',
+      'font-calligraphy': '"Zhi Mang Xing", cursive',
+      'font-impact': '"Dela Gothic One", cursive'
     };
 
     const imageInput = document.getElementById('imageInput');
@@ -918,7 +898,9 @@
 
       const titleText = cardTitle.innerText.trim();
       const titleFontSize = Math.round(state.titleFontSize * scaleFactor * scale);
-      const fontName = state.currentFont.replace('font-', '');
+
+      // 使用映射表獲取精確完整的 Font-Family 字型名稱
+      const fontFamily = fontMap[state.currentFont] || '"Noto Sans TC", sans-serif';
       const lineHeight = titleFontSize * 1.1;
 
       const maxTextWidth = boxWidth * scaleFactor - paddingLeft * 2;
@@ -928,7 +910,9 @@
       ctx.fillStyle = state.currentColor;
       ctx.shadowColor = 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = 12 * scaleFactor;
-      ctx.font = `900 ${titleFontSize}px ${fontName}, "Noto Sans TC", sans-serif`;
+      
+      // 設定 Canvas 的精確字型
+      ctx.font = `900 ${titleFontSize}px ${fontFamily}`;
       ctx.textBaseline = 'top';
 
       const currentCenterX = boxCenterX + centerOffsetX;
@@ -1008,6 +992,11 @@
         return;
       }
 
+      // 確保字型預載入完成後才渲染預覽 Canvas
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+
       const box = document.getElementById('previewCanvasBox');
       const stageRect = stageContainer.getBoundingClientRect();
       box.style.aspectRatio = `${stageRect.width} / ${stageRect.height}`;
@@ -1045,7 +1034,6 @@
       }
     }
 
-    // 呼叫原生分享/儲存面板
     async function shareImage() {
       try {
         const blob = await getCanvasBlob();
@@ -1059,7 +1047,6 @@
           });
           confetti({ particleCount: 60, spread: 60, origin: { y: 0.8 } });
         } else {
-          // 一般電腦或 Android 下載備用方案
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
