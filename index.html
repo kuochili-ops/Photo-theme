@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>𓃥 白六照片主題編輯</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Noto+Serif+TC:wght@700;900&family=Zhi+Mang+Xing&family=Dela+Gothic+One&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- MediaPipe Selfie Segmentation -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              300: '#debe6b',
+              400: '#d1a348',
+              500: '#b8852e',
+            }
+          },
+          fontFamily: {
+            sans: ['"Noto Sans TC"', 'sans-serif'],
+            serif: ['"Noto Serif TC"', 'serif'],
+            calligraphy: ['"Zhi Mang Xing"', 'cursive'],
+            impact: ['"Dela Gothic One"', 'cursive']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+    }
+
+    .responsive-title {
+      font-size: var(--title-font-size, 42px);
+      line-height: 1.1;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    [contenteditable]:empty:before {
+      content: attr(data-placeholder);
+      color: rgba(255, 255, 255, 0.6);
+      cursor: text;
+    }
+
+    .text-overlay-shadow {
+      text-shadow: 0 4px 12px rgba(0, 0, 0, 0.8), 0 2px 4px rgba(0,0,0,0.9);
+    }
+
+    .drag-handle {
+      touch-action: none;
+    }
+
+    #brushCursor {
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .highlight-mask {
+      opacity: 0.65;
+      filter: sepia(1) saturate(8) hue-rotate(-50deg);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
+    <div class="flex items-center gap-2">
+      <span class="text-xl font-bold bg-gradient-to-r from-brand-300 to-amber-200 bg-clip-text text-transparent flex items-center gap-1.5">
+        𓃥 白六照片主題編輯
+      </span>
+      <span class="text-[10px] bg-brand-300/10 text-brand-300 px-2 py-0.5 rounded-full border border-brand-300/20 font-mono">3D Dynamic Depth</span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button id="btnReset" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 transition" title="重置">
+        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+      </button>
+      <button onclick="openPreviewModal()" class="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-brand-300 to-amber-500 hover:from-brand-400 hover:to-amber-600 text-slate-950 font-semibold text-xs rounded-xl shadow-lg shadow-brand-300/10 active:scale-95 transition">
+        <i data-lucide="eye" class="w-4 h-4"></i>
+        <span>預覽成果</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主編輯區 -->
+  <main class="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center justify-start gap-4">
+
+    <!-- 3D 景深卡片舞台 -->
+    <div id="cardContainer" class="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-all duration-300">
+      
+      <!-- Stage -->
+      <div id="stageContainer" class="relative bg-slate-950 w-full aspect-square overflow-hidden group touch-none">
+        
+        <!-- 上傳按鈕 (空狀態) -->
+        <label id="uploadPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-3 cursor-pointer p-6 text-center hover:bg-slate-900/50 transition z-50">
+          <div class="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-brand-300 shadow-inner">
+            <i data-lucide="image-plus" class="w-7 h-7"></i>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-slate-200">點擊上傳照片</p>
+            <p class="text-xs text-slate-500 mt-1">支援文字 3D 動態穿透進場與角度旋轉</p>
+          </div>
+          <input type="file" id="imageInput" accept="image/*" class="hidden">
+        </label>
+
+        <!-- AI 運算處理中遮罩 -->
+        <div id="aiLoadingMask" class="absolute inset-0 bg-slate-950/80 backdrop-blur-md hidden flex-col items-center justify-center gap-3 z-50">
+          <div class="w-10 h-10 border-4 border-brand-300/20 border-t-brand-300 rounded-full animate-spin"></div>
+          <p class="text-xs font-semibold text-brand-300">AI 正自動預判主體圖層中...</p>
+        </div>
+
+        <!-- 【圖層 3：最底層】原始照片背景 (z-index: 0) -->
+        <img id="layerBottom" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none z-0" alt="Full Image" />
+
+        <!-- 【圖層 2：中間層】文字圖層 (z-index: 10) -->
+        <div 
+          id="layerMiddleText" 
+          class="absolute z-10 p-3 rounded-2xl bg-black/20 backdrop-blur-xs border border-white/20 shadow-2xl flex flex-col gap-1 active:border-brand-300 transition-all duration-75 drag-handle"
+          style="top: 25px; left: 25px; width: 160px; min-width: 90px; max-width: 90%; --title-font-size: 42px; transform-origin: center center;"
+        >
+          <!-- 左上：拖曳位移 -->
+          <div id="dragHeader" class="drag-handle absolute -top-3 -left-3 w-7 h-7 rounded-full bg-brand-300 text-slate-950 flex items-center justify-center shadow-md cursor-move">
+            <i data-lucide="move" class="w-3.5 h-3.5"></i>
+          </div>
+
+          <!-- 右上：角度旋轉 -->
+          <div id="rotateHandle" class="drag-handle absolute -top-3 -right-3 w-7 h-7 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing">
+            <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+          </div>
+
+          <!-- 右側：調整寬度 -->
+          <div id="widthHandle" class="drag-handle absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-md cursor-ew-resize">
+            <i data-lucide="grip-vertical" class="w-3 h-3"></i>
+          </div>
+
+          <!-- 右下：等比例字型大小縮放 -->
+          <div id="scaleHandle" class="drag-handle absolute -bottom-2.5 -right-2.5 w-6 h-6 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-md cursor-se-resize">
+            <i data-lucide="maximize-2" class="w-3 h-3"></i>
+          </div>
+
+          <div 
+            id="cardTitle" 
+            contenteditable="true" 
+            data-placeholder="輸入文字..." 
+            class="responsive-title font-black text-white outline-none text-overlay-shadow tracking-wider transition-colors duration-200"
+          >早安</div>
+        </div>
+
+        <!-- 【圖層 1：最上層前景主體 Canvas】 (z-index: 20) -->
+        <canvas id="layerTopSubject" class="absolute inset-0 w-full h-full object-cover hidden z-20"></canvas>
+
+        <!-- 筆刷觸控指示器 -->
+        <div id="brushCursor" class="absolute hidden rounded-full border-2 border-dashed border-yellow-300 bg-red-500/30 shadow-lg z-30 flex items-center justify-center transition-all duration-75">
+          <div class="w-2 h-2 rounded-full bg-yellow-400"></div>
+        </div>
+
+        <!-- 圖片控制項 -->
+        <div id="imageOverlayControls" class="absolute top-3 left-3 hidden flex-col gap-2 z-40">
+          <label class="p-2 rounded-xl bg-slate-900/80 backdrop-blur-md text-slate-200 hover:bg-slate-800 cursor-pointer shadow-lg border border-slate-700/50 active:scale-90 transition">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            <input type="file" id="imageReplaceInput" accept="image/*" class="hidden">
+          </label>
+          <button id="btnRemoveImage" class="p-2 rounded-xl bg-red-500/80 backdrop-blur-md text-white hover:bg-red-600 shadow-lg border border-red-500/30 active:scale-90 transition">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- 提示標籤 -->
+        <div id="eraserBadge" class="absolute top-3 right-3 hidden items-center gap-1.5 px-3 py-1 bg-red-500 text-white font-bold text-xs rounded-full shadow-lg backdrop-blur-md z-40 animate-pulse">
+          <i id="modeBadgeIcon" data-lucide="eraser" class="w-3.5 h-3.5"></i>
+          <span id="modeBadgeText">橡皮擦：擦除區域露出文字</span>
+        </div>
+
+      </div>
+
+      <!-- 操作選單 -->
+      <div class="px-4 py-3 bg-slate-950/90 border-t border-slate-800 flex flex-col gap-2.5">
+        
+        <div class="grid grid-cols-4 gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
+          <button id="btnModeMove" onclick="setInteractionMode('move')" class="py-1.5 text-[11px] font-semibold rounded-lg bg-brand-300 text-slate-950 flex items-center justify-center gap-1 transition">
+            <i data-lucide="move" class="w-3.5 h-3.5"></i> 移動
+          </button>
+
+          <button id="btnToggleHighlight" onclick="toggleHighlightOverlay()" class="py-1.5 text-[11px] font-semibold rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700 flex items-center justify-center gap-1 transition">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-red-400"></i> 套色
+          </button>
+
+          <button id="btnModeErase" onclick="setInteractionMode('erase')" class="py-1.5 text-[11px] font-semibold rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1 transition">
+            <i data-lucide="eraser" class="w-3.5 h-3.5"></i> 橡皮擦
+          </button>
+
+          <button id="btnModePaint" onclick="setInteractionMode('paint')" class="py-1.5 text-[11px] font-semibold rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1 transition">
+            <i data-lucide="paint-brush" class="w-3.5 h-3.5"></i> 畫筆
+          </button>
+        </div>
+
+        <div id="brushSizeBar" class="flex items-center gap-3 px-1 py-1 bg-slate-900/60 rounded-xl border border-slate-800">
+          <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
+            <i data-lucide="circle-dot" class="w-3.5 h-3.5 text-brand-300"></i> 接觸面積
+          </span>
+          <input 
+            type="range" 
+            id="brushSizeInput" 
+            min="10" 
+            max="80" 
+            value="30" 
+            class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-300"
+          />
+          <span id="brushSizeVal" class="text-xs font-mono text-brand-300 shrink-0 w-8 text-right">30px</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5 text-brand-300"></i> 文字
+          </span>
+          <input 
+            type="text" 
+            id="textInputBar" 
+            placeholder="修改標題..." 
+            value="早安" 
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-brand-300 transition"
+          />
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
+            <i data-lucide="type" class="w-3.5 h-3.5 text-brand-300"></i> 字型
+          </span>
+          <div class="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            <button onclick="changeFont('font-sans')" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 rounded-lg font-sans border border-slate-700 whitespace-nowrap active:scale-95 transition">黑體</button>
+            <button onclick="changeFont('font-serif')" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 rounded-lg font-serif border border-slate-700 whitespace-nowrap active:scale-95 transition">明體</button>
+            <button onclick="changeFont('font-calligraphy')" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 rounded-lg font-calligraphy border border-slate-700 whitespace-nowrap active:scale-95 transition">書法</button>
+            <button onclick="changeFont('font-impact')" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 rounded-lg font-impact border border-slate-700 whitespace-nowrap active:scale-95 transition">厚黑</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
+            <i data-lucide="palette" class="w-3.5 h-3.5 text-brand-300"></i> 顏色
+          </span>
+          <div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+            <button onclick="changeColor('#ffffff')" class="w-6 h-6 rounded-full bg-white border border-slate-600 shrink-0 active:scale-90 transition"></button>
+            <button onclick="changeColor('#debe6b')" class="w-6 h-6 rounded-full bg-[#debe6b] border border-slate-600 shrink-0 active:scale-90 transition"></button>
+            <button onclick="changeColor('#f87171')" class="w-6 h-6 rounded-full bg-red-400 border border-slate-600 shrink-0 active:scale-90 transition"></button>
+            <button onclick="changeColor('#60a5fa')" class="w-6 h-6 rounded-full bg-blue-400 border border-slate-600 shrink-0 active:scale-90 transition"></button>
+            <button onclick="changeColor('#34d399')" class="w-6 h-6 rounded-full bg-emerald-400 border border-slate-600 shrink-0 active:scale-90 transition"></button>
+            <button onclick="changeColor('#a78bfa')" class="w-6 h-6 rounded-full bg-purple-400 border border-slate-600 shrink-0 active:scale-90 transition"></button>
+            <button onclick="changeColor('#facc15')" class="w-6 h-6 rounded-full bg-yellow-400 border border-slate-600 shrink-0 active:scale-90 transition"></button>
+            
+            <label class="w-6 h-6 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-400 border border-slate-600 cursor-pointer shrink-0 active:scale-90 transition flex items-center justify-center">
+              <input type="color" onchange="changeColor(this.value)" class="opacity-0 w-0 h-0">
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="px-5 py-2.5 bg-slate-950 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+        <span class="flex items-center gap-1">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-300"></i> 白六圖文
+        </span>
+        <span id="charCount">2 字</span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- 底部選單 -->
+  <div class="sticky bottom-0 z-30 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-4 py-3">
+    <div class="w-full max-w-sm mx-auto flex items-center justify-around gap-2">
+      
+      <button onclick="toggleAspect()" class="flex flex-col items-center gap-1 text-slate-400 hover:text-brand-300 active:scale-95 transition">
+        <i data-lucide="crop" class="w-5 h-5"></i>
+        <span class="text-[10px]" id="aspectLabel">1:1 正方形</span>
+      </button>
+
+      <button onclick="resetTextPos()" class="flex flex-col items-center gap-1 text-slate-400 hover:text-brand-300 active:scale-95 transition">
+        <i data-lucide="locate-fixed" class="w-5 h-5"></i>
+        <span class="text-[10px]">文字歸位</span>
+      </button>
+
+      <button onclick="toggleDepth()" class="flex flex-col items-center gap-1 text-slate-400 hover:text-brand-300 active:scale-95 transition">
+        <i data-lucide="layers" class="w-5 h-5"></i>
+        <span class="text-[10px]" id="depthLabel">景深：開啟</span>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- 【預覽成果 Modal (支援 3D 動態穿透、複製、分享與存檔)】 -->
+  <div id="previewModal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex flex-col items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+          <i data-lucide="clapperboard" class="w-5 h-5 text-brand-300"></i> 3D 動態進場預覽
+        </h3>
+        <button onclick="closePreviewModal()" class="text-slate-400 hover:text-slate-200 p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- 進場模式選擇與播放控制按鈕 -->
+      <div class="flex items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
+        <select id="animTypeSelect" class="bg-slate-900 text-xs text-slate-200 border border-slate-700 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-brand-300 flex-1">
+          <option value="left">從左向右滑入</option>
+          <option value="right">從右向左滑入</option>
+          <option value="bottom">從下向上滑入</option>
+          <option value="zoom">淡入放大</option>
+          <option value="none">無動畫 (靜態)</option>
+        </select>
+
+        <button onclick="triggerAnimationPlay()" class="px-3 py-1.5 bg-brand-300 hover:bg-brand-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition">
+          <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+          <span>播放動畫</span>
+        </button>
+      </div>
+
+      <!-- Canvas 預覽畫布 -->
+      <div id="previewCanvasBox" class="w-full rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner relative">
+        <canvas id="previewCanvas" class="w-full h-full object-contain"></canvas>
+
+        <!-- 錄影倒數提示 Overlay -->
+        <div id="countdownOverlay" class="absolute inset-0 bg-slate-950/70 backdrop-blur-xs hidden flex-col items-center justify-center gap-2 z-30">
+          <p class="text-xs font-semibold text-slate-300">請準備啟動螢幕錄影...</p>
+          <span id="countdownNum" class="text-5xl font-black text-brand-300 animate-bounce">3</span>
+        </div>
+      </div>
+
+      <!-- 快捷匯出操作列（複製 / 分享 / 儲存） -->
+      <div class="grid grid-cols-3 gap-2 pt-1">
+        <button onclick="copyToClipboard()" class="py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition active:scale-95 flex items-center justify-center gap-1">
+          <i data-lucide="copy" class="w-3.5 h-3.5 text-cyan-300"></i>
+          <span>複製照片</span>
+        </button>
+
+        <button onclick="shareImage()" class="py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition active:scale-95 flex items-center justify-center gap-1">
+          <i data-lucide="share-2" class="w-3.5 h-3.5 text-emerald-300"></i>
+          <span>分享</span>
+        </button>
+
+        <button onclick="saveImageToGallery()" class="py-2.5 rounded-xl bg-gradient-to-r from-brand-300 to-amber-500 hover:from-brand-400 hover:to-amber-600 text-slate-950 font-bold text-xs transition active:scale-95 shadow-lg shadow-brand-300/10 flex items-center justify-center gap-1">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>儲存相簿</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      currentImgElement: null,
+      aspectRatio: '1:1',
+      isDepthOn: true,
+      isHighlightOn: false,
+      currentMode: 'move',
+      brushSize: 30,
+      currentFont: 'font-sans',
+      currentColor: '#ffffff',
+      titleFontSize: 42,
+      textRotationDeg: 0
+    };
+
+    const imageInput = document.getElementById('imageInput');
+    const imageReplaceInput = document.getElementById('imageReplaceInput');
+    const layerBottom = document.getElementById('layerBottom');
+    const layerMiddleText = document.getElementById('layerMiddleText');
+    const layerTopSubject = document.getElementById('layerTopSubject');
+    
+    const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+    const imageOverlayControls = document.getElementById('imageOverlayControls');
+    const btnRemoveImage = document.getElementById('btnRemoveImage');
+    const stageContainer = document.getElementById('stageContainer');
+    
+    const cardTitle = document.getElementById('cardTitle');
+    const textInputBar = document.getElementById('textInputBar');
+    const charCount = document.getElementById('charCount');
+    const brushCursor = document.getElementById('brushCursor');
+    const brushSizeInput = document.getElementById('brushSizeInput');
+    const brushSizeVal = document.getElementById('brushSizeVal');
+
+    let selfieSegmentation = null;
+    let animReqId = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+
+      textInputBar.addEventListener('input', (e) => {
+        cardTitle.innerText = e.target.value;
+        updateCharCount();
+      });
+
+      cardTitle.addEventListener('input', (e) => {
+        textInputBar.value = e.target.innerText;
+        updateCharCount();
+      });
+
+      brushSizeInput.addEventListener('input', (e) => {
+        state.brushSize = parseInt(e.target.value, 10);
+        brushSizeVal.textContent = `${state.brushSize}px`;
+        updateBrushCursorSize();
+      });
+
+      imageInput.addEventListener('change', handleImageUpload);
+      imageReplaceInput.addEventListener('change', handleImageUpload);
+      btnRemoveImage.addEventListener('click', removeImage);
+      
+      document.getElementById('btnReset').addEventListener('click', resetAll);
+
+      initAISegmentation();
+      initInteractionEngine();
+    });
+
+    function initAISegmentation() {
+      try {
+        selfieSegmentation = new SelfieSegmentation({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+        });
+        selfieSegmentation.setOptions({ modelSelection: 1 });
+      } catch (err) {
+        console.warn('AI Segmentation 模型載入失敗:', err);
+      }
+    }
+
+    function updateBrushCursorSize() {
+      brushCursor.style.width = `${state.brushSize}px`;
+      brushCursor.style.height = `${state.brushSize}px`;
+    }
+
+    function updateCharCount() {
+      const len = (cardTitle.innerText || '').length;
+      charCount.textContent = `${len} 字`;
+    }
+
+    function changeFont(fontClass) {
+      cardTitle.className = cardTitle.className.replace(/font-\w+/g, fontClass);
+      state.currentFont = fontClass;
+    }
+
+    function changeColor(colorHex) {
+      cardTitle.style.color = colorHex;
+      state.currentColor = colorHex;
+    }
+
+    function setInteractionMode(mode) {
+      state.currentMode = mode;
+      const btnMove = document.getElementById('btnModeMove');
+      const btnErase = document.getElementById('btnModeErase');
+      const btnPaint = document.getElementById('btnModePaint');
+      const eraserBadge = document.getElementById('eraserBadge');
+      const modeBadgeText = document.getElementById('modeBadgeText');
+
+      btnMove.className = "py-1.5 text-[11px] font-semibold rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1 transition";
+      btnErase.className = "py-1.5 text-[11px] font-semibold rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1 transition";
+      btnPaint.className = "py-1.5 text-[11px] font-semibold rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1 transition";
+
+      if (mode === 'move') {
+        btnMove.className = "py-1.5 text-[11px] font-semibold rounded-lg bg-brand-300 text-slate-950 flex items-center justify-center gap-1 transition";
+        eraserBadge.classList.add('hidden');
+      } else if (mode === 'erase') {
+        btnErase.className = "py-1.5 text-[11px] font-semibold rounded-lg bg-red-500 text-white flex items-center justify-center gap-1 transition shadow-lg shadow-red-500/20";
+        eraserBadge.classList.remove('hidden');
+        eraserBadge.classList.add('flex');
+        modeBadgeText.textContent = "橡皮擦：擦除主體露出文字";
+      } else if (mode === 'paint') {
+        btnPaint.className = "py-1.5 text-[11px] font-semibold rounded-lg bg-emerald-500 text-white flex items-center justify-center gap-1 transition shadow-lg shadow-emerald-500/20";
+        eraserBadge.classList.remove('hidden');
+        eraserBadge.classList.add('flex');
+        modeBadgeText.textContent = "主體畫筆：塗抹區域還原為主體";
+      }
+
+      updateBrushCursorSize();
+    }
+
+    function toggleHighlightOverlay() {
+      state.isHighlightOn = !state.isHighlightOn;
+      const btn = document.getElementById('btnToggleHighlight');
+      const canvas = layerTopSubject;
+
+      if (state.isHighlightOn) {
+        btn.className = "py-1.5 text-[11px] font-semibold rounded-lg bg-red-500 text-white flex items-center justify-center gap-1 transition shadow-lg shadow-red-500/30";
+        canvas.classList.add('highlight-mask');
+        if (state.currentMode === 'move') setInteractionMode('erase');
+      } else {
+        btn.className = "py-1.5 text-[11px] font-semibold rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700 flex items-center justify-center gap-1 transition";
+        canvas.classList.remove('highlight-mask');
+        setInteractionMode('move');
+      }
+    }
+
+    function compressAndLoadImage(file, maxDimension = 2048) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            let width = img.naturalWidth || img.width;
+            let height = img.naturalHeight || img.height;
+
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
+
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+
+              const compressedImg = new Image();
+              compressedImg.onload = () => resolve(compressedImg);
+              compressedImg.src = canvas.toDataURL('image/jpeg', 0.85);
+            } else {
+              resolve(img);
+            }
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function handleImageUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const img = await compressAndLoadImage(file, 2048);
+      state.currentImgElement = img;
+
+      layerBottom.src = img.src;
+      layerBottom.classList.remove('hidden');
+
+      uploadPlaceholder.classList.add('hidden');
+      imageOverlayControls.classList.remove('hidden');
+      imageOverlayControls.classList.add('flex');
+
+      await processAIPrediction(img);
+    }
+
+    function drawImgObjectCover(ctx, img, targetW, targetH) {
+      const imgW = img.naturalWidth || img.width;
+      const imgH = img.naturalHeight || img.height;
+
+      const imgRatio = imgW / imgH;
+      const targetRatio = targetW / targetH;
+
+      let renderW, renderH, renderX, renderY;
+
+      if (imgRatio > targetRatio) {
+        renderH = targetH;
+        renderW = targetH * imgRatio;
+        renderX = (targetW - renderW) / 2;
+        renderY = 0;
+      } else {
+        renderW = targetW;
+        renderH = targetW / imgRatio;
+        renderX = 0;
+        renderY = (targetH - renderH) / 2;
+      }
+
+      ctx.drawImage(img, renderX, renderY, renderW, renderH);
+    }
+
+    async function processAIPrediction(img) {
+      const aiMask = document.getElementById('aiLoadingMask');
+      aiMask.classList.remove('hidden');
+      aiMask.classList.add('flex');
+
+      const canvasSubject = layerTopSubject;
+      const ctxSub = canvasSubject.getContext('2d');
+      const stageRect = stageContainer.getBoundingClientRect();
+
+      const w = Math.round(stageRect.width * 2);
+      const h = Math.round(stageRect.height * 2);
+
+      canvasSubject.width = w;
+      canvasSubject.height = h;
+
+      if (selfieSegmentation) {
+        selfieSegmentation.onResults((results) => {
+          ctxSub.clearRect(0, 0, w, h);
+          ctxSub.save();
+          ctxSub.drawImage(results.segmentationMask, 0, 0, w, h);
+          ctxSub.globalCompositeOperation = 'source-in';
+          drawImgObjectCover(ctxSub, img, w, h);
+          ctxSub.restore();
+
+          aiMask.classList.add('hidden');
+          aiMask.classList.remove('flex');
+          
+          toggleHighlightOverlay();
+          if (state.isDepthOn) canvasSubject.classList.remove('hidden');
+        });
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d');
+        drawImgObjectCover(tempCtx, img, w, h);
+
+        await selfieSegmentation.send({ image: tempCanvas });
+      } else {
+        drawImgObjectCover(ctxSub, img, w, h);
+        aiMask.classList.add('hidden');
+        toggleHighlightOverlay();
+        if (state.isDepthOn) canvasSubject.classList.remove('hidden');
+      }
+    }
+
+    function toggleDepth() {
+      state.isDepthOn = !state.isDepthOn;
+      const depthLabel = document.getElementById('depthLabel');
+      if (state.isDepthOn) {
+        layerTopSubject.classList.remove('hidden');
+        depthLabel.textContent = '景深：開啟';
+      } else {
+        layerTopSubject.classList.add('hidden');
+        depthLabel.textContent = '景深：關閉';
+      }
+    }
+
+    function removeImage() {
+      state.currentImgElement = null;
+      layerBottom.src = '';
+      layerBottom.classList.add('hidden');
+      layerTopSubject.classList.add('hidden');
+
+      uploadPlaceholder.classList.remove('hidden');
+      imageOverlayControls.classList.add('hidden');
+      imageOverlayControls.classList.remove('flex');
+      imageInput.value = '';
+      imageReplaceInput.value = '';
+    }
+
+    function initInteractionEngine() {
+      let activeTarget = null;
+
+      let startX = 0, startY = 0;
+      let initialLeft = 25, initialTop = 25;
+      let initialWidth = 160;
+      let initialFontSize = 42;
+      let textCenter = { x: 0, y: 0 };
+
+      const canvasSub = layerTopSubject;
+      const ctxSub = canvasSub.getContext('2d');
+
+      const TOUCH_OFFSET_Y = 25;
+
+      const handleStart = (e) => {
+        const touch = e.touches ? e.touches[0] : e;
+        const rect = canvasSub.getBoundingClientRect();
+        const clickX = touch.clientX - rect.left;
+        const clickY = touch.clientY - rect.top;
+
+        if (state.currentMode === 'erase' || state.currentMode === 'paint') {
+          activeTarget = state.currentMode;
+          const targetY = clickY - TOUCH_OFFSET_Y;
+          brushCursor.style.left = `${clickX}px`;
+          brushCursor.style.top = `${targetY}px`;
+          brushCursor.classList.remove('hidden');
+
+          applyBrushAction(clickX, targetY, rect, state.currentMode);
+          e.preventDefault();
+          return;
+        }
+
+        const rotateHandle = document.getElementById('rotateHandle');
+        const widthHandle = document.getElementById('widthHandle');
+        const scaleHandle = document.getElementById('scaleHandle');
+
+        const rotateRect = rotateHandle.getBoundingClientRect();
+        const widthRect = widthHandle.getBoundingClientRect();
+        const scaleRect = scaleHandle.getBoundingClientRect();
+
+        if (touch.clientX >= rotateRect.left - 15 && touch.clientX <= rotateRect.right + 15 &&
+            touch.clientY >= rotateRect.top - 15 && touch.clientY <= rotateRect.bottom + 15) {
+          activeTarget = 'rotate';
+          const textRect = layerMiddleText.getBoundingClientRect();
+          textCenter = {
+            x: textRect.left + textRect.width / 2,
+            y: textRect.top + textRect.height / 2
+          };
+          e.preventDefault();
+          return;
+        }
+
+        if (touch.clientX >= widthRect.left - 15 && touch.clientX <= widthRect.right + 15 &&
+            touch.clientY >= widthRect.top - 15 && touch.clientY <= widthRect.bottom + 15) {
+          activeTarget = 'width';
+          startX = touch.clientX;
+          initialWidth = layerMiddleText.offsetWidth;
+          e.preventDefault();
+          return;
+        }
+
+        if (touch.clientX >= scaleRect.left - 15 && touch.clientX <= scaleRect.right + 15 &&
+            touch.clientY >= scaleRect.top - 15 && touch.clientY <= scaleRect.bottom + 15) {
+          activeTarget = 'scale';
+          startX = touch.clientX;
+          startY = touch.clientY;
+          initialWidth = layerMiddleText.offsetWidth;
+          initialFontSize = state.titleFontSize;
+          e.preventDefault();
+          return;
+        }
+
+        const textRect = layerMiddleText.getBoundingClientRect();
+        const containerRect = stageContainer.getBoundingClientRect();
+
+        if (touch.clientX >= textRect.left && touch.clientX <= textRect.right &&
+            touch.clientY >= textRect.top && touch.clientY <= textRect.bottom) {
+          activeTarget = 'dragText';
+          startX = touch.clientX;
+          startY = touch.clientY;
+          initialLeft = textRect.left - containerRect.left;
+          initialTop = textRect.top - containerRect.top;
+          e.preventDefault();
+        }
+      };
+
+      const handleMove = (e) => {
+        if (!activeTarget) return;
+
+        const touch = e.touches ? e.touches[0] : e;
+        const rect = canvasSub.getBoundingClientRect();
+        const clickX = touch.clientX - rect.left;
+        const clickY = touch.clientY - rect.top;
+
+        if (activeTarget === 'erase' || activeTarget === 'paint') {
+          const targetY = clickY - TOUCH_OFFSET_Y;
+          brushCursor.style.left = `${clickX}px`;
+          brushCursor.style.top = `${targetY}px`;
+          applyBrushAction(clickX, targetY, rect, activeTarget);
+          e.preventDefault();
+          return;
+        }
+
+        const deltaX = touch.clientX - startX;
+
+        if (activeTarget === 'rotate') {
+          const radians = Math.atan2(touch.clientY - textCenter.y, touch.clientX - textCenter.x);
+          let deg = Math.round(radians * (180 / Math.PI)) + 45;
+          state.textRotationDeg = deg;
+          layerMiddleText.style.transform = `rotate(${deg}deg)`;
+          e.preventDefault();
+          return;
+        }
+
+        if (activeTarget === 'dragText') {
+          const containerRect = stageContainer.getBoundingClientRect();
+          let newLeft = initialLeft + deltaX;
+          let newTop = initialTop + (touch.clientY - startY);
+
+          newLeft = Math.max(-50, Math.min(containerRect.width - 20, newLeft));
+          newTop = Math.max(-50, Math.min(containerRect.height - 20, newTop));
+
+          layerMiddleText.style.left = `${newLeft}px`;
+          layerMiddleText.style.top = `${newTop}px`;
+        }
+
+        if (activeTarget === 'width') {
+          const containerRect = stageContainer.getBoundingClientRect();
+          const currentLeft = layerMiddleText.offsetLeft;
+          const maxAllowedWidth = containerRect.width - currentLeft - 10;
+
+          const newWidth = Math.max(80, Math.min(maxAllowedWidth, initialWidth + deltaX));
+          layerMiddleText.style.width = `${newWidth}px`;
+        }
+
+        if (activeTarget === 'scale') {
+          const containerRect = stageContainer.getBoundingClientRect();
+          const currentLeft = layerMiddleText.offsetLeft;
+          const maxAllowedWidth = containerRect.width - currentLeft - 10;
+
+          const scaleRatio = (initialWidth + deltaX) / initialWidth;
+          const newWidth = Math.max(80, Math.min(maxAllowedWidth, initialWidth + deltaX));
+          const newFontSize = Math.max(16, Math.min(120, Math.round(initialFontSize * scaleRatio)));
+
+          layerMiddleText.style.width = `${newWidth}px`;
+          state.titleFontSize = newFontSize;
+
+          layerMiddleText.style.setProperty('--title-font-size', `${newFontSize}px`);
+        }
+
+        e.preventDefault();
+      };
+
+      const handleEnd = () => {
+        activeTarget = null;
+        brushCursor.classList.add('hidden');
+      };
+
+      function applyBrushAction(cssX, cssY, rect, mode) {
+        const scaleX = canvasSub.width / rect.width;
+        const scaleY = canvasSub.height / rect.height;
+
+        const realX = cssX * scaleX;
+        const realY = cssY * scaleY;
+        const radius = (state.brushSize / 2) * scaleX;
+
+        ctxSub.save();
+
+        if (mode === 'erase') {
+          ctxSub.globalCompositeOperation = 'destination-out';
+          ctxSub.beginPath();
+          ctxSub.arc(realX, realY, radius, 0, Math.PI * 2, false);
+          ctxSub.fill();
+        } else if (mode === 'paint') {
+          ctxSub.globalCompositeOperation = 'source-over';
+          ctxSub.beginPath();
+          ctxSub.arc(realX, realY, radius, 0, Math.PI * 2, false);
+          ctxSub.clip();
+
+          drawImgObjectCover(ctxSub, state.currentImgElement, canvasSub.width, canvasSub.height);
+        }
+
+        ctxSub.restore();
+      }
+
+      canvasSub.addEventListener('touchstart', handleStart, { passive: false });
+      canvasSub.addEventListener('touchmove', handleMove, { passive: false });
+      canvasSub.addEventListener('touchend', handleEnd);
+
+      canvasSub.addEventListener('mousedown', handleStart);
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('mouseup', handleEnd);
+    }
+
+    function getMultilineTextLines(ctx, text, maxWidth) {
+      if (!text) return [];
+      const words = text.split('');
+      const lines = [];
+      let currentLine = words[0] || '';
+
+      for (let i = 1; i < words.length; i++) {
+        const word = words[i];
+        const width = ctx.measureText(currentLine + word).width;
+        if (width <= maxWidth) {
+          currentLine += word;
+        } else {
+          lines.push(currentLine);
+          currentLine = word;
+        }
+      }
+      lines.push(currentLine);
+      return lines;
+    }
+
+    function renderAnimationFrame(progress, animType) {
+      const pCanvas = document.getElementById('previewCanvas');
+      const ctx = pCanvas.getContext('2d');
+      const stageRect = stageContainer.getBoundingClientRect();
+
+      const targetWidth = 1080;
+      const targetHeight = Math.round(targetWidth * (stageRect.height / stageRect.width));
+
+      pCanvas.width = targetWidth;
+      pCanvas.height = targetHeight;
+
+      if (state.currentImgElement) {
+        drawImgObjectCover(ctx, state.currentImgElement, targetWidth, targetHeight);
+      }
+
+      const boxLeft = layerMiddleText.offsetLeft;
+      const boxTop = layerMiddleText.offsetTop;
+      const boxWidth = layerMiddleText.offsetWidth;
+      const boxHeight = layerMiddleText.offsetHeight;
+
+      const titleElem = document.getElementById('cardTitle');
+      const titleStyle = window.getComputedStyle(titleElem);
+      const paddingLeft = parseFloat(titleStyle.paddingLeft) || 12;
+
+      const boxCenterRelX = (boxLeft + boxWidth / 2) / stageRect.width;
+      const boxCenterRelY = (boxTop + boxHeight / 2) / stageRect.height;
+
+      const canvasCenterX = boxCenterRelX * targetWidth;
+      const canvasCenterY = boxCenterRelY * targetHeight;
+
+      let centerOffsetX = 0;
+      let centerOffsetY = 0;
+      let alpha = 1;
+      let scale = 1;
+
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+      if (animType === 'left') {
+        centerOffsetX = -(targetWidth * 0.6) * (1 - easeProgress);
+      } else if (animType === 'right') {
+        centerOffsetX = (targetWidth * 0.6) * (1 - easeProgress);
+      } else if (animType === 'bottom') {
+        centerOffsetY = (targetHeight * 0.5) * (1 - easeProgress);
+      } else if (animType === 'zoom') {
+        alpha = easeProgress;
+        scale = 0.3 + 0.7 * easeProgress;
+      }
+
+      const titleText = cardTitle.innerText.trim();
+      const scaleFactor = targetWidth / stageRect.width;
+      const titleFontSize = Math.round(state.titleFontSize * scaleFactor * scale);
+      const fontName = state.currentFont.replace('font-', '');
+      const lineHeight = titleFontSize * 1.15;
+
+      const maxTextWidth = (boxWidth - paddingLeft * 2) * scaleFactor;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = state.currentColor;
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = 12 * scaleFactor;
+      ctx.font = `900 ${titleFontSize}px ${fontName}, "Noto Sans TC", sans-serif`;
+
+      const currentCenterX = canvasCenterX + centerOffsetX;
+      const currentCenterY = canvasCenterY + centerOffsetY;
+
+      ctx.translate(currentCenterX, currentCenterY);
+      ctx.rotate((state.textRotationDeg * Math.PI) / 180);
+
+      const titleLines = getMultilineTextLines(ctx, titleText, maxTextWidth);
+      const totalTextHeight = titleLines.length * lineHeight;
+
+      const drawLocalX = -maxTextWidth / 2;
+      let drawLocalY = -totalTextHeight / 2 + titleFontSize * 0.85;
+
+      titleLines.forEach((line) => {
+        ctx.fillText(line, drawLocalX, drawLocalY);
+        drawLocalY += lineHeight;
+      });
+
+      ctx.restore();
+
+      if (state.isDepthOn) {
+        ctx.drawImage(layerTopSubject, 0, 0, targetWidth, targetHeight);
+      }
+    }
+
+    function triggerAnimationPlay() {
+      const animType = document.getElementById('animTypeSelect').value;
+      const countdownOverlay = document.getElementById('countdownOverlay');
+      const countdownNum = document.getElementById('countdownNum');
+
+      if (animType === 'none') {
+        renderAnimationFrame(1, 'none');
+        return;
+      }
+
+      countdownOverlay.classList.remove('hidden');
+      countdownOverlay.classList.add('flex');
+      let count = 3;
+      countdownNum.textContent = count;
+
+      const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdownNum.textContent = count;
+        } else {
+          clearInterval(timer);
+          countdownOverlay.classList.add('hidden');
+          countdownOverlay.classList.remove('flex');
+          
+          startCanvasAnimation(animType, 1200);
+        }
+      }, 1000);
+    }
+
+    function startCanvasAnimation(animType, duration = 1200) {
+      if (animReqId) cancelAnimationFrame(animReqId);
+
+      const startTime = performance.now();
+
+      function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(1, elapsed / duration);
+
+        renderAnimationFrame(progress, animType);
+
+        if (progress < 1) {
+          animReqId = requestAnimationFrame(step);
+        }
+      }
+
+      animReqId = requestAnimationFrame(step);
+    }
+
+    async function openPreviewModal() {
+      if (!state.currentImgElement) {
+        alert('請先上傳照片！');
+        return;
+      }
+
+      const box = document.getElementById('previewCanvasBox');
+      const stageRect = stageContainer.getBoundingClientRect();
+      box.style.aspectRatio = `${stageRect.width} / ${stageRect.height}`;
+
+      document.getElementById('previewModal').classList.remove('hidden');
+
+      setTimeout(() => {
+        triggerAnimationPlay();
+      }, 200);
+    }
+
+    function closePreviewModal() {
+      if (animReqId) cancelAnimationFrame(animReqId);
+      document.getElementById('previewModal').classList.add('hidden');
+    }
+
+    // 將 Canvas 轉為 Blob 檔案
+    function getCanvasBlob() {
+      renderAnimationFrame(1, 'none');
+      const pCanvas = document.getElementById('previewCanvas');
+      return new Promise((resolve) => pCanvas.toBlob(resolve, 'image/png'));
+    }
+
+    // 1. 複製照片至剪貼簿
+    async function copyToClipboard() {
+      try {
+        const blob = await getCanvasBlob();
+        if (!navigator.clipboard || !window.ClipboardItem) {
+          alert('您的瀏覽器暫不支援直接複製圖片，請使用「儲存相簿」或「分享」。');
+          return;
+        }
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        confetti({ particleCount: 50, spread: 50, origin: { y: 0.8 } });
+        alert('照片已成功複製到剪貼簿！');
+      } catch (err) {
+        alert('複製失敗，請直接點選「儲存相簿」。');
+      }
+    }
+
+    // 2. 呼叫原生分享面板 (LINE、訊息、AirDrop 等)
+    async function shareImage() {
+      try {
+        const blob = await getCanvasBlob();
+        const file = new File([blob], 'white6_photo.png', { type: 'image/png' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: '𓃥 白六照片主題編輯',
+            text: '這是我用「白六照片主題編輯」製作的照片！'
+          });
+        } else {
+          alert('您的裝置暫不支援原生分享，請使用「儲存相簿」。');
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error('分享失敗:', err);
+      }
+    }
+
+    // 3. 儲存至相簿（iOS 選取「儲存影像」可直接存進 iPhone 相簿）
+    async function saveImageToGallery() {
+      try {
+        const blob = await getCanvasBlob();
+        const file = new File([blob], 'white6_photo.png', { type: 'image/png' });
+
+        // Safari / iPhone 優先觸拂原生分享選單 (用戶直接點選「儲存影像」即入相簿)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: '儲存照片',
+          });
+          confetti({ particleCount: 60, spread: 60, origin: { y: 0.8 } });
+        } else {
+          // 一般電腦或 Android 下載備用方案
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `white6_photo_${Date.now()}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          confetti({ particleCount: 60, spread: 60, origin: { y: 0.8 } });
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') alert('儲存發生異常，請重試。');
+      }
+    }
+
+    function resetTextPos() {
+      layerMiddleText.style.top = '25px';
+      layerMiddleText.style.left = '25px';
+      layerMiddleText.style.width = '160px';
+      state.titleFontSize = 42;
+      state.textRotationDeg = 0;
+      layerMiddleText.style.transform = 'rotate(0deg)';
+      layerMiddleText.style.setProperty('--title-font-size', '42px');
+    }
+
+    function toggleAspect() {
+      const container = stageContainer;
+      const label = document.getElementById('aspectLabel');
+
+      if (state.aspectRatio === '1:1') {
+        state.aspectRatio = '4:5';
+        container.className = 'relative bg-slate-950 w-full aspect-[4/5] overflow-hidden group touch-none transition-all duration-300';
+        label.textContent = '4:5 肖像';
+      } else if (state.aspectRatio === '4:5') {
+        state.aspectRatio = '16:9';
+        container.className = 'relative bg-slate-950 w-full aspect-video overflow-hidden group touch-none transition-all duration-300';
+        label.textContent = '16:9 橫向';
+      } else {
+        state.aspectRatio = '1:1';
+        container.className = 'relative bg-slate-950 w-full aspect-square overflow-hidden group touch-none transition-all duration-300';
+        label.textContent = '1:1 正方形';
+      }
+
+      if (state.currentImgElement) {
+        setTimeout(() => {
+          processAIPrediction(state.currentImgElement);
+        }, 350);
+      }
+    }
+
+    function resetAll() {
+      removeImage();
+      cardTitle.innerText = '';
+      textInputBar.value = '';
+      resetTextPos();
+      updateCharCount();
+    }
+  </script>
+</body>
+</html>
