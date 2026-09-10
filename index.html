@@ -199,7 +199,7 @@
         
         <div class="grid grid-cols-4 gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
           <button id="btnModeMove" onclick="setInteractionMode('move')" class="py-1.5 text-[11px] font-semibold rounded-lg bg-brand-300 text-slate-950 flex items-center justify-center gap-1 transition">
-            <i data-lucide="move" class="w-3.5 h-3.5"></i> 移動
+            <i data-lucide="move" class="w-3.5 h-3.5"></i> 文字移動
           </button>
 
           <button id="btnToggleHighlight" onclick="toggleHighlightOverlay()" class="py-1.5 text-[11px] font-semibold rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700 flex items-center justify-center gap-1 transition">
@@ -348,21 +348,16 @@
         </div>
       </div>
 
-      <!-- 快捷匯出操作列（複製 / 分享 / 儲存） -->
-      <div class="grid grid-cols-3 gap-2 pt-1">
+      <!-- 快捷匯出操作列（複製 / 分享/儲存） -->
+      <div class="grid grid-cols-2 gap-2 pt-1">
         <button onclick="copyToClipboard()" class="py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition active:scale-95 flex items-center justify-center gap-1">
           <i data-lucide="copy" class="w-3.5 h-3.5 text-cyan-300"></i>
           <span>複製照片</span>
         </button>
 
-        <button onclick="shareImage()" class="py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition active:scale-95 flex items-center justify-center gap-1">
-          <i data-lucide="share-2" class="w-3.5 h-3.5 text-emerald-300"></i>
-          <span>分享</span>
-        </button>
-
-        <button onclick="saveImageToGallery()" class="py-2.5 rounded-xl bg-gradient-to-r from-brand-300 to-amber-500 hover:from-brand-400 hover:to-amber-600 text-slate-950 font-bold text-xs transition active:scale-95 shadow-lg shadow-brand-300/10 flex items-center justify-center gap-1">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i>
-          <span>儲存相簿</span>
+        <button onclick="shareImage()" class="py-2.5 rounded-xl bg-gradient-to-r from-brand-300 to-amber-500 hover:from-brand-400 hover:to-amber-600 text-slate-950 font-bold text-xs transition active:scale-95 shadow-lg shadow-brand-300/10 flex items-center justify-center gap-1">
+          <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+          <span>分享/儲存</span>
         </button>
       </div>
     </div>
@@ -482,7 +477,7 @@
         btnErase.className = "py-1.5 text-[11px] font-semibold rounded-lg bg-red-500 text-white flex items-center justify-center gap-1 transition shadow-lg shadow-red-500/20";
         eraserBadge.classList.remove('hidden');
         eraserBadge.classList.add('flex');
-        modeBadgeText.textContent = "橡皮擦：擦除主體露出文字";
+        modeBadgeText.textContent = "橡皮擦：擦除區域露出文字";
       } else if (mode === 'paint') {
         btnPaint.className = "py-1.5 text-[11px] font-semibold rounded-lg bg-emerald-500 text-white flex items-center justify-center gap-1 transition shadow-lg shadow-emerald-500/20";
         eraserBadge.classList.remove('hidden');
@@ -872,7 +867,6 @@
       return lines;
     }
 
-    // 動態繪製與動畫運算 (支援 top/bottom/left/right/zoom 動態)
     function renderAnimationFrame(progress, animType) {
       const pCanvas = document.getElementById('previewCanvas');
       const ctx = pCanvas.getContext('2d');
@@ -1040,17 +1034,18 @@
       try {
         const blob = await getCanvasBlob();
         if (!navigator.clipboard || !window.ClipboardItem) {
-          alert('您的瀏覽器暫不支援直接複製圖片，請使用「儲存相簿」或「分享」。');
+          alert('您的瀏覽器暫不支援直接複製圖片，請點選「分享/儲存」。');
           return;
         }
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
         confetti({ particleCount: 50, spread: 50, origin: { y: 0.8 } });
         alert('照片已成功複製到剪貼簿！');
       } catch (err) {
-        alert('複製失敗，請直接點選「儲存相簿」。');
+        alert('複製失敗，請直接點選「分享/儲存」。');
       }
     }
 
+    // 呼叫原生分享/儲存面板
     async function shareImage() {
       try {
         const blob = await getCanvasBlob();
@@ -1062,26 +1057,9 @@
             title: '𓃥 白六照片主題編輯',
             text: '這是我用「白六照片主題編輯」製作的照片！'
           });
-        } else {
-          alert('您的裝置暫不支援原生分享，請使用「儲存相簿」。');
-        }
-      } catch (err) {
-        if (err.name !== 'AbortError') console.error('分享失敗:', err);
-      }
-    }
-
-    async function saveImageToGallery() {
-      try {
-        const blob = await getCanvasBlob();
-        const file = new File([blob], 'white6_photo.png', { type: 'image/png' });
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: '儲存照片',
-          });
           confetti({ particleCount: 60, spread: 60, origin: { y: 0.8 } });
         } else {
+          // 一般電腦或 Android 下載備用方案
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -1093,7 +1071,7 @@
           confetti({ particleCount: 60, spread: 60, origin: { y: 0.8 } });
         }
       } catch (err) {
-        if (err.name !== 'AbortError') alert('儲存發生異常，請重試。');
+        if (err.name !== 'AbortError') console.error('分享發生異常:', err);
       }
     }
 
