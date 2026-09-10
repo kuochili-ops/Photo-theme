@@ -323,9 +323,10 @@
       <!-- 進場模式選擇與播放控制按鈕 -->
       <div class="flex items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
         <select id="animTypeSelect" class="bg-slate-900 text-xs text-slate-200 border border-slate-700 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-brand-300 flex-1">
+          <option value="top">從上向下滑入</option>
+          <option value="bottom">從下向上滑入</option>
           <option value="left">從左向右滑入</option>
           <option value="right">從右向左滑入</option>
-          <option value="bottom">從下向上滑入</option>
           <option value="zoom">淡入放大</option>
           <option value="none">無動畫 (靜態)</option>
         </select>
@@ -871,6 +872,7 @@
       return lines;
     }
 
+    // 動態繪製與動畫運算 (支援 top/bottom/left/right/zoom 動態)
     function renderAnimationFrame(progress, animType) {
       const pCanvas = document.getElementById('previewCanvas');
       const ctx = pCanvas.getContext('2d');
@@ -886,6 +888,7 @@
         drawImgObjectCover(ctx, state.currentImgElement, targetWidth, targetHeight);
       }
 
+      const scaleFactor = targetWidth / stageRect.width;
       const boxLeft = layerMiddleText.offsetLeft;
       const boxTop = layerMiddleText.offsetTop;
       const boxWidth = layerMiddleText.offsetWidth;
@@ -893,13 +896,11 @@
 
       const titleElem = document.getElementById('cardTitle');
       const titleStyle = window.getComputedStyle(titleElem);
-      const paddingLeft = parseFloat(titleStyle.paddingLeft) || 12;
+      const paddingLeft = (parseFloat(titleStyle.paddingLeft) || 12) * scaleFactor;
+      const paddingTop = (parseFloat(titleStyle.paddingTop) || 12) * scaleFactor;
 
-      const boxCenterRelX = (boxLeft + boxWidth / 2) / stageRect.width;
-      const boxCenterRelY = (boxTop + boxHeight / 2) / stageRect.height;
-
-      const canvasCenterX = boxCenterRelX * targetWidth;
-      const canvasCenterY = boxCenterRelY * targetHeight;
+      const boxCenterX = (boxLeft + boxWidth / 2) * scaleFactor;
+      const boxCenterY = (boxTop + boxHeight / 2) * scaleFactor;
 
       let centerOffsetX = 0;
       let centerOffsetY = 0;
@@ -908,24 +909,25 @@
 
       const easeProgress = 1 - Math.pow(1 - progress, 3);
 
-      if (animType === 'left') {
+      if (animType === 'top') {
+        centerOffsetY = -(targetHeight * 0.5) * (1 - easeProgress);
+      } else if (animType === 'bottom') {
+        centerOffsetY = (targetHeight * 0.5) * (1 - easeProgress);
+      } else if (animType === 'left') {
         centerOffsetX = -(targetWidth * 0.6) * (1 - easeProgress);
       } else if (animType === 'right') {
         centerOffsetX = (targetWidth * 0.6) * (1 - easeProgress);
-      } else if (animType === 'bottom') {
-        centerOffsetY = (targetHeight * 0.5) * (1 - easeProgress);
       } else if (animType === 'zoom') {
         alpha = easeProgress;
         scale = 0.3 + 0.7 * easeProgress;
       }
 
       const titleText = cardTitle.innerText.trim();
-      const scaleFactor = targetWidth / stageRect.width;
       const titleFontSize = Math.round(state.titleFontSize * scaleFactor * scale);
       const fontName = state.currentFont.replace('font-', '');
-      const lineHeight = titleFontSize * 1.15;
+      const lineHeight = titleFontSize * 1.1;
 
-      const maxTextWidth = (boxWidth - paddingLeft * 2) * scaleFactor;
+      const maxTextWidth = boxWidth * scaleFactor - paddingLeft * 2;
 
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -933,22 +935,22 @@
       ctx.shadowColor = 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = 12 * scaleFactor;
       ctx.font = `900 ${titleFontSize}px ${fontName}, "Noto Sans TC", sans-serif`;
+      ctx.textBaseline = 'top';
 
-      const currentCenterX = canvasCenterX + centerOffsetX;
-      const currentCenterY = canvasCenterY + centerOffsetY;
+      const currentCenterX = boxCenterX + centerOffsetX;
+      const currentCenterY = boxCenterY + centerOffsetY;
 
       ctx.translate(currentCenterX, currentCenterY);
       ctx.rotate((state.textRotationDeg * Math.PI) / 180);
 
       const titleLines = getMultilineTextLines(ctx, titleText, maxTextWidth);
-      const totalTextHeight = titleLines.length * lineHeight;
 
-      const drawLocalX = -maxTextWidth / 2;
-      let drawLocalY = -totalTextHeight / 2 + titleFontSize * 0.85;
+      const localLeftX = -boxWidth * scaleFactor / 2 + paddingLeft;
+      let localTopY = -boxHeight * scaleFactor / 2 + paddingTop - titleFontSize * 0.14;
 
       titleLines.forEach((line) => {
-        ctx.fillText(line, drawLocalX, drawLocalY);
-        drawLocalY += lineHeight;
+        ctx.fillText(line, localLeftX, localTopY);
+        localTopY += lineHeight;
       });
 
       ctx.restore();
@@ -1028,14 +1030,12 @@
       document.getElementById('previewModal').classList.add('hidden');
     }
 
-    // 將 Canvas 轉為 Blob 檔案
     function getCanvasBlob() {
       renderAnimationFrame(1, 'none');
       const pCanvas = document.getElementById('previewCanvas');
       return new Promise((resolve) => pCanvas.toBlob(resolve, 'image/png'));
     }
 
-    // 1. 複製照片至剪貼簿
     async function copyToClipboard() {
       try {
         const blob = await getCanvasBlob();
@@ -1051,7 +1051,6 @@
       }
     }
 
-    // 2. 呼叫原生分享面板 (LINE、訊息、AirDrop 等)
     async function shareImage() {
       try {
         const blob = await getCanvasBlob();
@@ -1071,13 +1070,11 @@
       }
     }
 
-    // 3. 儲存至相簿（iOS 選取「儲存影像」可直接存進 iPhone 相簿）
     async function saveImageToGallery() {
       try {
         const blob = await getCanvasBlob();
         const file = new File([blob], 'white6_photo.png', { type: 'image/png' });
 
-        // Safari / iPhone 優先觸拂原生分享選單 (用戶直接點選「儲存影像」即入相簿)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
@@ -1085,7 +1082,6 @@
           });
           confetti({ particleCount: 60, spread: 60, origin: { y: 0.8 } });
         } else {
-          // 一般電腦或 Android 下載備用方案
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
