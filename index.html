@@ -45,20 +45,10 @@
     }
 
     .responsive-title {
-      font-size: var(--title-font-size, 42px);
+      font-size: var(--title-font-size, 36px);
       line-height: 1.1;
       white-space: pre-wrap;
       word-break: break-word;
-    }
-
-    [contenteditable]:empty:before {
-      content: attr(data-placeholder);
-      color: rgba(255, 255, 255, 0.6);
-      cursor: text;
-    }
-
-    .text-overlay-shadow {
-      text-shadow: 0 4px 12px rgba(0, 0, 0, 0.8), 0 2px 4px rgba(0,0,0,0.9);
     }
 
     .drag-handle {
@@ -74,6 +64,13 @@
       opacity: 0.65;
       filter: sepia(1) saturate(8) hue-rotate(-50deg);
     }
+
+    /* 非當前選擇之文字層的半透明樣式 */
+    .text-layer-inactive {
+      opacity: 0.75;
+      border: 1px dashed rgba(255, 255, 255, 0.4) !important;
+      background: rgba(0, 0, 0, 0.15) !important;
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
@@ -83,7 +80,7 @@
       <span class="text-xl font-bold bg-gradient-to-r from-brand-300 to-amber-200 bg-clip-text text-transparent flex items-center gap-1.5">
         𓃥 白六照片主題編輯
       </span>
-      <span class="text-[10px] bg-brand-300/10 text-brand-300 px-2 py-0.5 rounded-full border border-brand-300/20 font-mono">3D Dynamic Depth</span>
+      <span class="text-[10px] bg-brand-300/10 text-brand-300 px-2 py-0.5 rounded-full border border-brand-300/20 font-mono">Multi-Text Depth</span>
     </div>
 
     <div class="flex items-center gap-2">
@@ -92,7 +89,7 @@
       </button>
       <button onclick="openPreviewModal()" class="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-brand-300 to-amber-500 hover:from-brand-400 hover:to-amber-600 text-slate-950 font-semibold text-xs rounded-xl shadow-lg shadow-brand-300/10 active:scale-95 transition">
         <i data-lucide="eye" class="w-4 h-4"></i>
-        <span>預覽成果</span>
+        <span>預覽動畫/錄影</span>
       </button>
     </div>
   </header>
@@ -111,7 +108,7 @@
           
           <div>
             <label for="imageInput" class="text-sm font-semibold text-slate-200 cursor-pointer hover:underline block">點擊上傳照片</label>
-            <p class="text-xs text-slate-500 mt-1">支援 3D 動態文字穿透與角度旋轉</p>
+            <p class="text-xs text-slate-500 mt-1">支援多層動態文字穿透與畫布錄影</p>
           </div>
 
           <button onclick="pasteFromClipboard()" class="mt-1 flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-brand-300 font-medium text-xs rounded-xl shadow-md active:scale-95 transition">
@@ -127,34 +124,7 @@
 
         <img id="layerBottom" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none z-0" alt="Full Image" />
 
-        <div 
-          id="layerMiddleText" 
-          class="absolute z-10 p-3 rounded-2xl bg-black/20 backdrop-blur-xs border border-white/20 shadow-2xl flex flex-col gap-1 active:border-brand-300 transition-all duration-75 drag-handle"
-          style="top: 25px; left: 25px; width: 160px; min-width: 90px; max-width: 90%; --title-font-size: 42px; transform-origin: center center;"
-        >
-          <div id="dragHeader" class="drag-handle absolute -top-3 -left-3 w-7 h-7 rounded-full bg-brand-300 text-slate-950 flex items-center justify-center shadow-md cursor-move">
-            <i data-lucide="move" class="w-3.5 h-3.5"></i>
-          </div>
-
-          <div id="rotateHandle" class="drag-handle absolute -top-3 -right-3 w-7 h-7 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing">
-            <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
-          </div>
-
-          <div id="widthHandle" class="drag-handle absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-md cursor-ew-resize">
-            <i data-lucide="grip-vertical" class="w-3 h-3"></i>
-          </div>
-
-          <div id="scaleHandle" class="drag-handle absolute -bottom-2.5 -right-2.5 w-6 h-6 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-md cursor-se-resize">
-            <i data-lucide="maximize-2" class="w-3 h-3"></i>
-          </div>
-
-          <div 
-            id="cardTitle" 
-            contenteditable="true" 
-            data-placeholder="輸入文字..." 
-            class="responsive-title font-black text-white outline-none text-overlay-shadow tracking-wider transition-colors duration-200"
-          >早安</div>
-        </div>
+        <div id="multiTextDomContainer" class="absolute inset-0 pointer-events-none z-10"></div>
 
         <canvas id="layerTopSubject" class="absolute inset-0 w-full h-full object-cover hidden z-20"></canvas>
 
@@ -181,6 +151,16 @@
 
       <div class="px-4 py-3 bg-slate-950/90 border-t border-slate-800 flex flex-col gap-2.5">
         
+        <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar" id="textLayerTabs">
+            </div>
+
+          <button onclick="addNewTextLayer()" class="px-2.5 py-1 bg-brand-300/10 hover:bg-brand-300/20 text-brand-300 border border-brand-300/30 text-xs font-semibold rounded-lg shrink-0 active:scale-95 transition flex items-center gap-1">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>新增文字層</span>
+          </button>
+        </div>
+
         <div class="grid grid-cols-4 gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
           <button id="btnModeMove" onclick="setInteractionMode('move')" class="py-1.5 text-[11px] font-semibold rounded-lg bg-brand-300 text-slate-950 flex items-center justify-center gap-1 transition">
             <i data-lucide="move" class="w-3.5 h-3.5"></i> 文字移動
@@ -227,6 +207,25 @@
           />
         </div>
 
+        <div class="grid grid-cols-2 gap-2">
+          <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2 py-1">
+            <span class="text-[11px] text-slate-400 shrink-0">進場：</span>
+            <select id="layerAnimSelect" onchange="updateCurrentLayerAnim(this.value)" class="bg-transparent text-xs text-brand-300 font-semibold focus:outline-none w-full">
+              <option value="top">從上向下滑入</option>
+              <option value="bottom">從下向上滑入</option>
+              <option value="left">從左向右滑入</option>
+              <option value="right">從右向左滑入</option>
+              <option value="zoom">淡入放大</option>
+              <option value="none">靜態顯示</option>
+            </select>
+          </div>
+
+          <button onclick="toggleCurrentLayerDepth()" id="btnLayerDepth" class="px-2 py-1 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-1 transition">
+            <i data-lucide="layers" class="w-3.5 h-3.5 text-brand-300"></i>
+            <span id="layerDepthText">層級：景深穿透</span>
+          </button>
+        </div>
+
         <div class="flex items-center gap-2">
           <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
             <i data-lucide="type" class="w-3.5 h-3.5 text-brand-300"></i> 字型
@@ -264,7 +263,7 @@
         <span class="flex items-center gap-1">
           <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-300"></i> 白六圖文
         </span>
-        <span id="charCount">2 字</span>
+        <span id="charCount">1 個文字圖層</span>
       </div>
     </div>
 
@@ -280,7 +279,7 @@
 
       <button onclick="resetTextPos()" class="flex flex-col items-center gap-1 text-slate-400 hover:text-brand-300 active:scale-95 transition">
         <i data-lucide="locate-fixed" class="w-5 h-5"></i>
-        <span class="text-[10px]">文字歸位</span>
+        <span class="text-[10px]">位置歸位</span>
       </button>
 
       <button onclick="toggleDepth()" class="flex flex-col items-center gap-1 text-slate-400 hover:text-brand-300 active:scale-95 transition">
@@ -295,7 +294,7 @@
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
-          <i data-lucide="clapperboard" class="w-5 h-5 text-brand-300"></i> 3D 動態進場預覽
+          <i data-lucide="clapperboard" class="w-5 h-5 text-brand-300"></i> 多層次動態進場預覽
         </h3>
         <button onclick="closePreviewModal()" class="text-slate-400 hover:text-slate-200 p-1">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -303,45 +302,39 @@
       </div>
 
       <div class="flex items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
-        <select id="animTypeSelect" class="bg-slate-900 text-xs text-slate-200 border border-slate-700 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-brand-300 flex-1">
-          <option value="top">從上向下滑入</option>
-          <option value="bottom">從下向上滑入</option>
-          <option value="left">從左向右滑入</option>
-          <option value="right">從右向左滑入</option>
-          <option value="zoom">淡入放大</option>
-          <option value="none">無動畫 (靜態)</option>
-        </select>
-
-        <button onclick="triggerAnimationPlay()" class="px-3 py-1.5 bg-brand-300 hover:bg-brand-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition">
+        <button onclick="triggerAnimationPlay()" class="px-3.5 py-1.5 bg-brand-300 hover:bg-brand-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition flex-1 justify-center">
           <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
-          <span>播放動畫</span>
+          <span>重新播放動畫</span>
+        </button>
+
+        <button id="btnStartRecord" onclick="toggleScreenRecord()" class="px-3.5 py-1.5 bg-red-500 hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition">
+          <i data-lucide="video" class="w-3.5 h-3.5"></i>
+          <span id="recordBtnText">錄製影片</span>
         </button>
       </div>
 
       <div id="previewCanvasBox" class="w-full rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner relative">
         <canvas id="previewCanvas" class="w-full h-full object-contain"></canvas>
-
-        <div id="countdownOverlay" class="absolute inset-0 bg-slate-950/70 backdrop-blur-xs hidden flex-col items-center justify-center gap-2 z-30">
-          <p class="text-xs font-semibold text-slate-300">請準備啟動螢幕錄影...</p>
-          <span id="countdownNum" class="text-5xl font-black text-brand-300 animate-bounce">3</span>
-        </div>
       </div>
 
       <div class="grid grid-cols-2 gap-2 pt-1">
         <button onclick="copyToClipboard()" class="py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition active:scale-95 flex items-center justify-center gap-1">
           <i data-lucide="copy" class="w-3.5 h-3.5 text-cyan-300"></i>
-          <span>複製照片</span>
+          <span>複製圖片</span>
         </button>
 
         <button onclick="shareImage()" class="py-2.5 rounded-xl bg-gradient-to-r from-brand-300 to-amber-500 hover:from-brand-400 hover:to-amber-600 text-slate-950 font-bold text-xs transition active:scale-95 shadow-lg shadow-brand-300/10 flex items-center justify-center gap-1">
           <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
-          <span>分享/儲存</span>
+          <span>分享/儲存圖片</span>
         </button>
       </div>
     </div>
   </div>
 
+  <canvas id="originalSubjectCanvas" class="hidden"></canvas>
+
   <script>
+    // 全域多圖層狀態
     const state = {
       currentImgElement: null,
       aspectRatio: '1:1',
@@ -349,10 +342,24 @@
       isHighlightOn: false,
       currentMode: 'move',
       brushSize: 30,
-      currentFont: 'font-sans',
-      currentColor: '#ffffff',
-      titleFontSize: 42,
-      textRotationDeg: 0
+      
+      // 多文字圖層陣列
+      textLayers: [
+        {
+          id: 1,
+          text: '早安',
+          color: '#ffffff',
+          font: 'font-sans',
+          fontSize: 36,
+          rotation: 0,
+          left: 25,
+          top: 25,
+          width: 160,
+          animType: 'top',
+          belowSubject: true
+        }
+      ],
+      activeLayerIndex: 0
     };
 
     const fontMap = {
@@ -365,15 +372,15 @@
     const imageInput = document.getElementById('imageInput');
     const imageReplaceInput = document.getElementById('imageReplaceInput');
     const layerBottom = document.getElementById('layerBottom');
-    const layerMiddleText = document.getElementById('layerMiddleText');
     const layerTopSubject = document.getElementById('layerTopSubject');
+    const originalSubjectCanvas = document.getElementById('originalSubjectCanvas');
     
     const uploadPlaceholder = document.getElementById('uploadPlaceholder');
     const imageOverlayControls = document.getElementById('imageOverlayControls');
     const btnRemoveImage = document.getElementById('btnRemoveImage');
     const stageContainer = document.getElementById('stageContainer');
+    const multiTextDomContainer = document.getElementById('multiTextDomContainer');
     
-    const cardTitle = document.getElementById('cardTitle');
     const textInputBar = document.getElementById('textInputBar');
     const charCount = document.getElementById('charCount');
     const brushCursor = document.getElementById('brushCursor');
@@ -383,17 +390,19 @@
     let selfieSegmentation = null;
     let animReqId = null;
 
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
 
       textInputBar.addEventListener('input', (e) => {
-        cardTitle.innerText = e.target.value;
-        updateCharCount();
-      });
-
-      cardTitle.addEventListener('input', (e) => {
-        textInputBar.value = e.target.innerText;
-        updateCharCount();
+        const cur = state.textLayers[state.activeLayerIndex];
+        if (cur) {
+          cur.text = e.target.value;
+          renderAllTextLayersDOM();
+        }
       });
 
       brushSizeInput.addEventListener('input', (e) => {
@@ -407,13 +416,202 @@
       btnRemoveImage.addEventListener('click', removeImage);
       
       document.getElementById('btnReset').addEventListener('click', resetAll);
-
-      // 監聽鍵盤 Ctrl+V / Cmd+V 貼上圖片事件
       window.addEventListener('paste', handleGlobalPaste);
+
+      renderLayerTabs();
+      renderAllTextLayersDOM();
 
       initAISegmentation();
       initInteractionEngine();
     });
+
+    // 渲染圖層頁籤列表
+    function renderLayerTabs() {
+      const tabsBox = document.getElementById('textLayerTabs');
+      tabsBox.innerHTML = '';
+
+      state.textLayers.forEach((layer, idx) => {
+        const btn = document.createElement('button');
+        const isActive = idx === state.activeLayerIndex;
+
+        btn.className = `px-2.5 py-1 text-xs rounded-lg font-semibold shrink-0 transition flex items-center gap-1 ${
+          isActive 
+            ? 'bg-brand-300 text-slate-950 shadow-md' 
+            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+        }`;
+
+        btn.innerHTML = `
+          <span>文字層 ${idx + 1}</span>
+          ${state.textLayers.length > 1 ? `<i data-lucide="x" class="w-3 h-3 text-slate-400 hover:text-red-400" onclick="deleteTextLayer(event, ${idx})"></i>` : ''}
+        `;
+
+        btn.onclick = (e) => {
+          if (e.target.tagName.toLowerCase() !== 'i') {
+            switchActiveLayer(idx);
+          }
+        };
+
+        tabsBox.appendChild(btn);
+      });
+
+      lucide.createIcons();
+      charCount.textContent = `${state.textLayers.length} 個文字圖層`;
+    }
+
+    // 動態在舞台上渲染所有文字圖層
+    function renderAllTextLayersDOM() {
+      multiTextDomContainer.innerHTML = '';
+
+      state.textLayers.forEach((layer, idx) => {
+        const isActive = idx === state.activeLayerIndex;
+
+        const box = document.createElement('div');
+        box.className = `absolute pointer-events-auto p-3 rounded-2xl flex flex-col gap-1 transition-all duration-75 drag-handle ${
+          isActive 
+            ? 'z-30 bg-black/20 backdrop-blur-xs border border-white/30 shadow-2xl active:border-brand-300' 
+            : 'z-10 text-layer-inactive cursor-pointer'
+        }`;
+
+        box.style.left = `${layer.left}px`;
+        box.style.top = `${layer.top}px`;
+        box.style.width = `${layer.width}px`;
+        box.style.transform = `rotate(${layer.rotation}deg)`;
+        box.style.setProperty('--title-font-size', `${layer.fontSize}px`);
+
+        if (isActive) {
+          box.id = 'layerMiddleText';
+          box.innerHTML = `
+            <div id="dragHeader" class="drag-handle absolute -top-3 -left-3 w-7 h-7 rounded-full bg-brand-300 text-slate-950 flex items-center justify-center shadow-md cursor-move">
+              <i data-lucide="move" class="w-3.5 h-3.5"></i>
+            </div>
+            <div id="rotateHandle" class="drag-handle absolute -top-3 -right-3 w-7 h-7 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing">
+              <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+            </div>
+            <div id="widthHandle" class="drag-handle absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-md cursor-ew-resize">
+              <i data-lucide="grip-vertical" class="w-3 h-3"></i>
+            </div>
+            <div id="scaleHandle" class="drag-handle absolute -bottom-2.5 -right-2.5 w-6 h-6 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-md cursor-se-resize">
+              <i data-lucide="maximize-2" class="w-3 h-3"></i>
+            </div>
+            <div id="cardTitle" contenteditable="true" data-placeholder="輸入文字..." class="responsive-title font-black outline-none text-shadow tracking-wider transition-colors duration-200 ${layer.font}">${layer.text}</div>
+          `;
+        } else {
+          box.onclick = () => switchActiveLayer(idx);
+          box.innerHTML = `
+            <div class="responsive-title font-black outline-none text-shadow tracking-wider ${layer.font}">${layer.text}</div>
+          `;
+        }
+
+        const titleElem = box.querySelector('.responsive-title');
+        if (titleElem) titleElem.style.color = layer.color;
+
+        multiTextDomContainer.appendChild(box);
+      });
+
+      lucide.createIcons();
+
+      const activeTitle = document.getElementById('cardTitle');
+      if (activeTitle) {
+        activeTitle.addEventListener('input', (e) => {
+          const cur = state.textLayers[state.activeLayerIndex];
+          if (cur) {
+            cur.text = e.target.innerText;
+            textInputBar.value = e.target.innerText;
+          }
+        });
+      }
+    }
+
+    // 新增文字圖層（新文層獨立使用最初的 AI 主體去背）
+    function addNewTextLayer() {
+      const newId = Date.now();
+      const offset = (state.textLayers.length % 5) * 22;
+
+      state.textLayers.push({
+        id: newId,
+        text: `文字 ${state.textLayers.length + 1}`,
+        color: '#ffffff',
+        font: 'font-sans',
+        fontSize: 36,
+        rotation: 0,
+        left: 25 + offset,
+        top: 25 + offset,
+        width: 160,
+        animType: 'bottom',
+        belowSubject: true // 預設使用最初判定的 AI 主體層景深穿透
+      });
+
+      state.activeLayerIndex = state.textLayers.length - 1;
+      renderLayerTabs();
+      syncUIFromActiveLayer();
+      renderAllTextLayersDOM();
+    }
+
+    // 刪除指定文字層
+    function deleteTextLayer(e, index) {
+      e.stopPropagation();
+      if (state.textLayers.length <= 1) return;
+
+      state.textLayers.splice(index, 1);
+      if (state.activeLayerIndex >= state.textLayers.length) {
+        state.activeLayerIndex = state.textLayers.length - 1;
+      }
+
+      renderLayerTabs();
+      syncUIFromActiveLayer();
+      renderAllTextLayersDOM();
+    }
+
+    // 切換當前作用圖層
+    function switchActiveLayer(index) {
+      state.activeLayerIndex = index;
+      renderLayerTabs();
+      syncUIFromActiveLayer();
+      renderAllTextLayersDOM();
+    }
+
+    // 同步當前層 State 回控制選單
+    function syncUIFromActiveLayer() {
+      const cur = state.textLayers[state.activeLayerIndex];
+      if (!cur) return;
+
+      textInputBar.value = cur.text;
+      document.getElementById('layerAnimSelect').value = cur.animType;
+
+      const btnDepthText = document.getElementById('layerDepthText');
+      btnDepthText.textContent = cur.belowSubject ? '層級：景深穿透' : '層級：置於頂層';
+    }
+
+    function updateCurrentLayerAnim(type) {
+      const cur = state.textLayers[state.activeLayerIndex];
+      if (cur) cur.animType = type;
+    }
+
+    function toggleCurrentLayerDepth() {
+      const cur = state.textLayers[state.activeLayerIndex];
+      if (cur) {
+        cur.belowSubject = !cur.belowSubject;
+        syncUIFromActiveLayer();
+      }
+    }
+
+    function changeFont(fontClass) {
+      const cur = state.textLayers[state.activeLayerIndex];
+      if (cur) {
+        cur.font = fontClass;
+        syncUIFromActiveLayer();
+        renderAllTextLayersDOM();
+      }
+    }
+
+    function changeColor(colorHex) {
+      const cur = state.textLayers[state.activeLayerIndex];
+      if (cur) {
+        cur.color = colorHex;
+        syncUIFromActiveLayer();
+        renderAllTextLayersDOM();
+      }
+    }
 
     function initAISegmentation() {
       try {
@@ -429,21 +627,6 @@
     function updateBrushCursorSize() {
       brushCursor.style.width = `${state.brushSize}px`;
       brushCursor.style.height = `${state.brushSize}px`;
-    }
-
-    function updateCharCount() {
-      const len = (cardTitle.innerText || '').length;
-      charCount.textContent = `${len} 字`;
-    }
-
-    function changeFont(fontClass) {
-      cardTitle.className = cardTitle.className.replace(/font-\w+/g, fontClass);
-      state.currentFont = fontClass;
-    }
-
-    function changeColor(colorHex) {
-      cardTitle.style.color = colorHex;
-      state.currentColor = colorHex;
     }
 
     function setInteractionMode(mode) {
@@ -550,11 +733,10 @@
       await handleImageFile(file);
     }
 
-    // 從剪貼板讀取圖片並載入
     async function pasteFromClipboard() {
       try {
         if (!navigator.clipboard || !navigator.clipboard.read) {
-          alert('您的瀏覽器不支援直接存取剪貼板，請使用 Ctrl+V / Cmd+V 或上傳照片。');
+          alert('您的瀏覽器不支援直接存取剪貼板，請使用 Ctrl+V / Cmd+V。');
           return;
         }
 
@@ -570,11 +752,10 @@
         }
         alert('剪貼板中找不到圖片，請先複製照片後再試！');
       } catch (err) {
-        alert('讀取剪貼板失敗，請確認已授權瀏覽器剪貼板存取權限。');
+        alert('讀取剪貼板失敗，請確認已授權權限。');
       }
     }
 
-    // 全域鍵盤 Ctrl+V / Cmd+V 貼上監聽
     async function handleGlobalPaste(e) {
       if (!e.clipboardData || !e.clipboardData.items) return;
       
@@ -628,6 +809,11 @@
       canvasSubject.width = w;
       canvasSubject.height = h;
 
+      // 設定備份 Canvas 大小
+      originalSubjectCanvas.width = w;
+      originalSubjectCanvas.height = h;
+      const ctxOrig = originalSubjectCanvas.getContext('2d');
+
       if (selfieSegmentation) {
         selfieSegmentation.onResults((results) => {
           ctxSub.clearRect(0, 0, w, h);
@@ -636,6 +822,10 @@
           ctxSub.globalCompositeOperation = 'source-in';
           drawImgObjectCover(ctxSub, img, w, h);
           ctxSub.restore();
+
+          // 備份一份最初 AI 判定完成的主體畫布，確保後續新文層不受橡皮擦塗抹影響
+          ctxOrig.clearRect(0, 0, w, h);
+          ctxOrig.drawImage(canvasSubject, 0, 0);
 
           aiMask.classList.add('hidden');
           aiMask.classList.remove('flex');
@@ -653,6 +843,9 @@
         await selfieSegmentation.send({ image: tempCanvas });
       } else {
         drawImgObjectCover(ctxSub, img, w, h);
+        ctxOrig.clearRect(0, 0, w, h);
+        ctxOrig.drawImage(canvasSubject, 0, 0);
+
         aiMask.classList.add('hidden');
         toggleHighlightOverlay();
         if (state.isDepthOn) canvasSubject.classList.remove('hidden');
@@ -690,7 +883,7 @@
       let startX = 0, startY = 0;
       let initialLeft = 25, initialTop = 25;
       let initialWidth = 160;
-      let initialFontSize = 42;
+      let initialFontSize = 36;
       let textCenter = { x: 0, y: 0 };
 
       const canvasSub = layerTopSubject;
@@ -719,15 +912,18 @@
         const rotateHandle = document.getElementById('rotateHandle');
         const widthHandle = document.getElementById('widthHandle');
         const scaleHandle = document.getElementById('scaleHandle');
+        const activeTextLayerDOM = document.getElementById('layerMiddleText');
 
-        const rotateRect = rotateHandle.getBoundingClientRect();
-        const widthRect = widthHandle.getBoundingClientRect();
-        const scaleRect = scaleHandle.getBoundingClientRect();
+        if (!activeTextLayerDOM) return;
+
+        const rotateRect = rotateHandle ? rotateHandle.getBoundingClientRect() : { left: 0, right: 0, top: 0, bottom: 0 };
+        const widthRect = widthHandle ? widthHandle.getBoundingClientRect() : { left: 0, right: 0, top: 0, bottom: 0 };
+        const scaleRect = scaleHandle ? scaleHandle.getBoundingClientRect() : { left: 0, right: 0, top: 0, bottom: 0 };
 
         if (touch.clientX >= rotateRect.left - 15 && touch.clientX <= rotateRect.right + 15 &&
             touch.clientY >= rotateRect.top - 15 && touch.clientY <= rotateRect.bottom + 15) {
           activeTarget = 'rotate';
-          const textRect = layerMiddleText.getBoundingClientRect();
+          const textRect = activeTextLayerDOM.getBoundingClientRect();
           textCenter = {
             x: textRect.left + textRect.width / 2,
             y: textRect.top + textRect.height / 2
@@ -740,7 +936,7 @@
             touch.clientY >= widthRect.top - 15 && touch.clientY <= widthRect.bottom + 15) {
           activeTarget = 'width';
           startX = touch.clientX;
-          initialWidth = layerMiddleText.offsetWidth;
+          initialWidth = activeTextLayerDOM.offsetWidth;
           e.preventDefault();
           return;
         }
@@ -750,13 +946,15 @@
           activeTarget = 'scale';
           startX = touch.clientX;
           startY = touch.clientY;
-          initialWidth = layerMiddleText.offsetWidth;
-          initialFontSize = state.titleFontSize;
+          initialWidth = activeTextLayerDOM.offsetWidth;
+          
+          const cur = state.textLayers[state.activeLayerIndex];
+          initialFontSize = cur ? cur.fontSize : 36;
           e.preventDefault();
           return;
         }
 
-        const textRect = layerMiddleText.getBoundingClientRect();
+        const textRect = activeTextLayerDOM.getBoundingClientRect();
         const containerRect = stageContainer.getBoundingClientRect();
 
         if (touch.clientX >= textRect.left && touch.clientX <= textRect.right &&
@@ -778,6 +976,9 @@
         const clickX = touch.clientX - rect.left;
         const clickY = touch.clientY - rect.top;
 
+        const cur = state.textLayers[state.activeLayerIndex];
+        const activeTextLayerDOM = document.getElementById('layerMiddleText');
+
         if (activeTarget === 'erase' || activeTarget === 'paint') {
           const targetY = clickY - TOUCH_OFFSET_Y;
           brushCursor.style.left = `${clickX}px`;
@@ -787,13 +988,15 @@
           return;
         }
 
+        if (!activeTextLayerDOM) return;
+
         const deltaX = touch.clientX - startX;
 
         if (activeTarget === 'rotate') {
           const radians = Math.atan2(touch.clientY - textCenter.y, touch.clientX - textCenter.x);
           let deg = Math.round(radians * (180 / Math.PI)) + 45;
-          state.textRotationDeg = deg;
-          layerMiddleText.style.transform = `rotate(${deg}deg)`;
+          if (cur) cur.rotation = deg;
+          activeTextLayerDOM.style.transform = `rotate(${deg}deg)`;
           e.preventDefault();
           return;
         }
@@ -806,32 +1009,41 @@
           newLeft = Math.max(-50, Math.min(containerRect.width - 20, newLeft));
           newTop = Math.max(-50, Math.min(containerRect.height - 20, newTop));
 
-          layerMiddleText.style.left = `${newLeft}px`;
-          layerMiddleText.style.top = `${newTop}px`;
+          if (cur) {
+            cur.left = newLeft;
+            cur.top = newTop;
+          }
+
+          activeTextLayerDOM.style.left = `${newLeft}px`;
+          activeTextLayerDOM.style.top = `${newTop}px`;
         }
 
         if (activeTarget === 'width') {
           const containerRect = stageContainer.getBoundingClientRect();
-          const currentLeft = layerMiddleText.offsetLeft;
+          const currentLeft = activeTextLayerDOM.offsetLeft;
           const maxAllowedWidth = containerRect.width - currentLeft - 10;
 
           const newWidth = Math.max(80, Math.min(maxAllowedWidth, initialWidth + deltaX));
-          layerMiddleText.style.width = `${newWidth}px`;
+          if (cur) cur.width = newWidth;
+          activeTextLayerDOM.style.width = `${newWidth}px`;
         }
 
         if (activeTarget === 'scale') {
           const containerRect = stageContainer.getBoundingClientRect();
-          const currentLeft = layerMiddleText.offsetLeft;
+          const currentLeft = activeTextLayerDOM.offsetLeft;
           const maxAllowedWidth = containerRect.width - currentLeft - 10;
 
           const scaleRatio = (initialWidth + deltaX) / initialWidth;
           const newWidth = Math.max(80, Math.min(maxAllowedWidth, initialWidth + deltaX));
           const newFontSize = Math.max(16, Math.min(120, Math.round(initialFontSize * scaleRatio)));
 
-          layerMiddleText.style.width = `${newWidth}px`;
-          state.titleFontSize = newFontSize;
+          if (cur) {
+            cur.width = newWidth;
+            cur.fontSize = newFontSize;
+          }
 
-          layerMiddleText.style.setProperty('--title-font-size', `${newFontSize}px`);
+          activeTextLayerDOM.style.width = `${newWidth}px`;
+          activeTextLayerDOM.style.setProperty('--title-font-size', `${newFontSize}px`);
         }
 
         e.preventDefault();
@@ -898,31 +1110,19 @@
       return lines;
     }
 
-    function renderAnimationFrame(progress, animType) {
-      const pCanvas = document.getElementById('previewCanvas');
-      const ctx = pCanvas.getContext('2d');
-      const stageRect = stageContainer.getBoundingClientRect();
-
-      const targetWidth = 1080;
-      const targetHeight = Math.round(targetWidth * (stageRect.height / stageRect.width));
-
-      pCanvas.width = targetWidth;
-      pCanvas.height = targetHeight;
-
-      if (state.currentImgElement) {
-        drawImgObjectCover(ctx, state.currentImgElement, targetWidth, targetHeight);
-      }
+    // 單一文字圖層繪製邏輯
+    function drawSingleTextLayer(ctx, layer, progress, targetWidth, targetHeight, stageRect) {
+      if (progress <= 0) return; // 尚未輪到該層動畫時不繪製，確保依序登場
 
       const scaleFactor = targetWidth / stageRect.width;
-      const boxLeft = layerMiddleText.offsetLeft;
-      const boxTop = layerMiddleText.offsetTop;
-      const boxWidth = layerMiddleText.offsetWidth;
-      const boxHeight = layerMiddleText.offsetHeight;
+      
+      const boxLeft = layer.left;
+      const boxTop = layer.top;
+      const boxWidth = layer.width;
+      const boxHeight = 80;
 
-      const titleElem = document.getElementById('cardTitle');
-      const titleStyle = window.getComputedStyle(titleElem);
-      const paddingLeft = (parseFloat(titleStyle.paddingLeft) || 12) * scaleFactor;
-      const paddingTop = (parseFloat(titleStyle.paddingTop) || 12) * scaleFactor;
+      const paddingLeft = 12 * scaleFactor;
+      const paddingTop = 12 * scaleFactor;
 
       const boxCenterX = (boxLeft + boxWidth / 2) * scaleFactor;
       const boxCenterY = (boxTop + boxHeight / 2) * scaleFactor;
@@ -934,30 +1134,29 @@
 
       const easeProgress = 1 - Math.pow(1 - progress, 3);
 
-      if (animType === 'top') {
+      if (layer.animType === 'top') {
         centerOffsetY = -(targetHeight * 0.5) * (1 - easeProgress);
-      } else if (animType === 'bottom') {
+      } else if (layer.animType === 'bottom') {
         centerOffsetY = (targetHeight * 0.5) * (1 - easeProgress);
-      } else if (animType === 'left') {
+      } else if (layer.animType === 'left') {
         centerOffsetX = -(targetWidth * 0.6) * (1 - easeProgress);
-      } else if (animType === 'right') {
+      } else if (layer.animType === 'right') {
         centerOffsetX = (targetWidth * 0.6) * (1 - easeProgress);
-      } else if (animType === 'zoom') {
+      } else if (layer.animType === 'zoom') {
         alpha = easeProgress;
         scale = 0.3 + 0.7 * easeProgress;
       }
 
-      const titleText = cardTitle.innerText.trim();
-      const titleFontSize = Math.round(state.titleFontSize * scaleFactor * scale);
-
-      const fontFamily = fontMap[state.currentFont] || '"Noto Sans TC", sans-serif';
+      const titleText = (layer.text || '').trim();
+      const titleFontSize = Math.round(layer.fontSize * scaleFactor * scale);
+      const fontFamily = fontMap[layer.font] || '"Noto Sans TC", sans-serif';
       const lineHeight = titleFontSize * 1.1;
 
       const maxTextWidth = boxWidth * scaleFactor - paddingLeft * 2;
 
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = state.currentColor;
+      ctx.fillStyle = layer.color;
       ctx.shadowColor = 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = 12 * scaleFactor;
       
@@ -968,7 +1167,7 @@
       const currentCenterY = boxCenterY + centerOffsetY;
 
       ctx.translate(currentCenterX, currentCenterY);
-      ctx.rotate((state.textRotationDeg * Math.PI) / 180);
+      ctx.rotate((layer.rotation * Math.PI) / 180);
 
       const titleLines = getMultilineTextLines(ctx, titleText, maxTextWidth);
 
@@ -981,58 +1180,79 @@
       });
 
       ctx.restore();
-
-      if (state.isDepthOn) {
-        ctx.drawImage(layerTopSubject, 0, 0, targetWidth, targetHeight);
-      }
     }
 
-    function triggerAnimationPlay() {
-      const animType = document.getElementById('animTypeSelect').value;
-      const countdownOverlay = document.getElementById('countdownOverlay');
-      const countdownNum = document.getElementById('countdownNum');
+    // 多圖層獨立景深渲染（新文層一律使用最初 AI 判定的完整主體層，不受前一文層修飾影響）
+    function renderMultiLayerAnimationFrame(globalProgress) {
+      const pCanvas = document.getElementById('previewCanvas');
+      const ctx = pCanvas.getContext('2d');
+      const stageRect = stageContainer.getBoundingClientRect();
 
-      if (animType === 'none') {
-        renderAnimationFrame(1, 'none');
-        return;
+      const targetWidth = 1080;
+      const targetHeight = Math.round(targetWidth * (stageRect.height / stageRect.width));
+
+      pCanvas.width = targetWidth;
+      pCanvas.height = targetHeight;
+
+      // 1. 繪製最底層原始照片背景
+      if (state.currentImgElement) {
+        drawImgObjectCover(ctx, state.currentImgElement, targetWidth, targetHeight);
       }
 
-      countdownOverlay.classList.remove('hidden');
-      countdownOverlay.classList.add('flex');
-      let count = 3;
-      countdownNum.textContent = count;
+      // 2. 依序處理每個文字圖層
+      state.textLayers.forEach((layer, idx) => {
+        const layerProgress = computeSequentialProgress(globalProgress, idx, state.textLayers.length);
 
-      const timer = setInterval(() => {
-        count--;
-        if (count > 0) {
-          countdownNum.textContent = count;
-        } else {
-          clearInterval(timer);
-          countdownOverlay.classList.add('hidden');
-          countdownOverlay.classList.remove('flex');
-          
-          startCanvasAnimation(animType, 1200);
+        // 先繪製文字層
+        drawSingleTextLayer(ctx, layer, layerProgress, targetWidth, targetHeight, stageRect);
+
+        // 若該文字層開啟「景深穿透」，且動畫已開始展現
+        if (state.isDepthOn && layer.belowSubject && layerProgress > 0) {
+          // 判定：若該文字層是「當前正在被橡皮擦編輯的層」，使用編輯中的 Canvas；否則使用最初 AI 判定的乾淨主體備份
+          const subjectSource = (idx === state.activeLayerIndex) ? layerTopSubject : originalSubjectCanvas;
+          ctx.drawImage(subjectSource, 0, 0, targetWidth, targetHeight);
         }
-      }, 1000);
+      });
     }
 
-    function startCanvasAnimation(animType, duration = 1200) {
+    // 嚴格接續式時間軸算法：確保前一層完全到位後再啟動下一個
+    function computeSequentialProgress(globalProgress, index, total) {
+      if (total <= 1) return globalProgress;
+      
+      const layerDuration = 1 / total;
+      const startTime = index * layerDuration;
+      const endTime = startTime + layerDuration;
+
+      if (globalProgress < startTime) return 0;
+      if (globalProgress >= endTime) return 1;
+
+      return (globalProgress - startTime) / layerDuration;
+    }
+
+    function startCanvasAnimation(durationPerLayer = 1000) {
       if (animReqId) cancelAnimationFrame(animReqId);
 
+      const totalDuration = Math.max(1200, state.textLayers.length * durationPerLayer);
       const startTime = performance.now();
 
       function step(now) {
         const elapsed = now - startTime;
-        const progress = Math.min(1, elapsed / duration);
+        const progress = Math.min(1, elapsed / totalDuration);
 
-        renderAnimationFrame(progress, animType);
+        renderMultiLayerAnimationFrame(progress);
 
         if (progress < 1) {
           animReqId = requestAnimationFrame(step);
+        } else if (isRecording) {
+          stopScreenRecord();
         }
       }
 
       animReqId = requestAnimationFrame(step);
+    }
+
+    function triggerAnimationPlay() {
+      startCanvasAnimation(1000);
     }
 
     async function openPreviewModal() {
@@ -1058,11 +1278,80 @@
 
     function closePreviewModal() {
       if (animReqId) cancelAnimationFrame(animReqId);
+      if (isRecording) stopScreenRecord();
       document.getElementById('previewModal').classList.add('hidden');
     }
 
+    // Canvas 畫布錄影功能 (MediaRecorder API)
+    function toggleScreenRecord() {
+      if (isRecording) {
+        stopScreenRecord();
+      } else {
+        startScreenRecord();
+      }
+    }
+
+    function startScreenRecord() {
+      const pCanvas = document.getElementById('previewCanvas');
+      recordedChunks = [];
+
+      try {
+        const stream = pCanvas.captureStream(60);
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+      } catch (e) {
+        try {
+          const stream = pCanvas.captureStream(30);
+          mediaRecorder = new MediaRecorder(stream);
+        } catch (err) {
+          alert('您的瀏覽器暫不支援畫布錄影功能。');
+          return;
+        }
+      }
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = exportRecordedVideo;
+
+      mediaRecorder.start();
+      isRecording = true;
+
+      const recordBtnText = document.getElementById('recordBtnText');
+      recordBtnText.textContent = '錄影中...';
+      document.getElementById('btnStartRecord').className = "px-3.5 py-1.5 bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md animate-pulse";
+
+      triggerAnimationPlay();
+    }
+
+    function stopScreenRecord() {
+      if (!isRecording) return;
+      isRecording = false;
+
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+
+      const recordBtnText = document.getElementById('recordBtnText');
+      recordBtnText.textContent = '錄製影片';
+      document.getElementById('btnStartRecord').className = "px-3.5 py-1.5 bg-red-500 hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition";
+    }
+
+    function exportRecordedVideo() {
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `white6_animation_${Date.now()}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      confetti({ particleCount: 60, spread: 60, origin: { y: 0.8 } });
+    }
+
     function getCanvasBlob() {
-      renderAnimationFrame(1, 'none');
+      renderMultiLayerAnimationFrame(1);
       const pCanvas = document.getElementById('previewCanvas');
       return new Promise((resolve) => pCanvas.toBlob(resolve, 'image/png'));
     }
@@ -1111,13 +1400,16 @@
     }
 
     function resetTextPos() {
-      layerMiddleText.style.top = '25px';
-      layerMiddleText.style.left = '25px';
-      layerMiddleText.style.width = '160px';
-      state.titleFontSize = 42;
-      state.textRotationDeg = 0;
-      layerMiddleText.style.transform = 'rotate(0deg)';
-      layerMiddleText.style.setProperty('--title-font-size', '42px');
+      const cur = state.textLayers[state.activeLayerIndex];
+      if (cur) {
+        cur.left = 25;
+        cur.top = 25;
+        cur.width = 160;
+        cur.fontSize = 36;
+        cur.rotation = 0;
+        syncUIFromActiveLayer();
+        renderAllTextLayersDOM();
+      }
     }
 
     function toggleAspect() {
@@ -1147,10 +1439,25 @@
 
     function resetAll() {
       removeImage();
-      cardTitle.innerText = '';
-      textInputBar.value = '';
-      resetTextPos();
-      updateCharCount();
+      state.textLayers = [
+        {
+          id: Date.now(),
+          text: '',
+          color: '#ffffff',
+          font: 'font-sans',
+          fontSize: 36,
+          rotation: 0,
+          left: 25,
+          top: 25,
+          width: 160,
+          animType: 'top',
+          belowSubject: true
+        }
+      ];
+      state.activeLayerIndex = 0;
+      renderLayerTabs();
+      syncUIFromActiveLayer();
+      renderAllTextLayersDOM();
     }
   </script>
 </body>
