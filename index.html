@@ -217,6 +217,23 @@
           <span id="brushSizeVal" class="text-xs font-mono text-brand-300 shrink-0 w-8 text-right">30px</span>
         </div>
 
+        <!-- 動態進場速度控制拉桿 (主介面) -->
+        <div class="flex items-center gap-3 px-1 py-1 bg-slate-900/60 rounded-xl border border-slate-800">
+          <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
+            <i data-lucide="gauge" class="w-3.5 h-3.5 text-amber-400"></i> 進場速度
+          </span>
+          <input 
+            type="range" 
+            id="animSpeedInputMain" 
+            min="200" 
+            max="3000" 
+            step="100" 
+            value="1000" 
+            class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-400"
+          />
+          <span id="animSpeedValMain" class="text-xs font-mono text-amber-400 shrink-0 w-10 text-right">1.0s</span>
+        </div>
+
         <!-- 當前圖層設定項 -->
         <div class="flex items-center gap-2">
           <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
@@ -331,16 +348,37 @@
       </div>
 
       <!-- 播放控制與錄影 -->
-      <div class="flex items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
-        <button onclick="triggerAnimationPlay()" class="px-3.5 py-1.5 bg-brand-300 hover:bg-brand-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition flex-1 justify-center">
-          <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
-          <span>重新播放動畫</span>
-        </button>
+      <div class="flex flex-col gap-2 bg-slate-950 p-2.5 rounded-2xl border border-slate-800">
+        
+        <div class="flex items-center gap-2">
+          <button onclick="triggerAnimationPlay()" class="px-3.5 py-1.5 bg-brand-300 hover:bg-brand-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition flex-1 justify-center">
+            <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+            <span>重新播放動畫</span>
+          </button>
 
-        <button id="btnStartRecord" onclick="toggleScreenRecord()" class="px-3.5 py-1.5 bg-red-500 hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition">
-          <i data-lucide="video" class="w-3.5 h-3.5"></i>
-          <span id="recordBtnText">錄製影片</span>
-        </button>
+          <button id="btnStartRecord" onclick="toggleScreenRecord()" class="px-3.5 py-1.5 bg-red-500 hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition">
+            <i data-lucide="video" class="w-3.5 h-3.5"></i>
+            <span id="recordBtnText">錄製影片</span>
+          </button>
+        </div>
+
+        <!-- 動態進場速度控制拉桿 (Modal 內) -->
+        <div class="flex items-center gap-2 px-1 pt-1 border-t border-slate-800/80">
+          <span class="text-[11px] text-slate-400 font-medium shrink-0 flex items-center gap-1">
+            <i data-lucide="gauge" class="w-3.5 h-3.5 text-amber-400"></i> 單層速度
+          </span>
+          <input 
+            type="range" 
+            id="animSpeedInputModal" 
+            min="200" 
+            max="3000" 
+            step="100" 
+            value="1000" 
+            class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-400"
+          />
+          <span id="animSpeedValModal" class="text-[11px] font-mono text-amber-400 shrink-0 w-9 text-right">1.0s</span>
+        </div>
+
       </div>
 
       <!-- Canvas 預覽畫布 -->
@@ -374,6 +412,7 @@
       isHighlightOn: false,
       currentMode: 'move',
       brushSize: 30,
+      animDurationPerLayer: 1000, // 每層動畫預設 1000ms (1.0s)
       
       textLayers: [
         {
@@ -420,6 +459,11 @@
     const brushSizeInput = document.getElementById('brushSizeInput');
     const brushSizeVal = document.getElementById('brushSizeVal');
 
+    const animSpeedInputMain = document.getElementById('animSpeedInputMain');
+    const animSpeedValMain = document.getElementById('animSpeedValMain');
+    const animSpeedInputModal = document.getElementById('animSpeedInputModal');
+    const animSpeedValModal = document.getElementById('animSpeedValModal');
+
     let selfieSegmentation = null;
     let animReqId = null;
 
@@ -444,6 +488,15 @@
         updateBrushCursorSize();
       });
 
+      // 速度控制拉桿監聽 (主介面與 Modal 雙向同步)
+      animSpeedInputMain.addEventListener('input', (e) => {
+        updateAnimSpeed(parseInt(e.target.value, 10));
+      });
+
+      animSpeedInputModal.addEventListener('input', (e) => {
+        updateAnimSpeed(parseInt(e.target.value, 10));
+      });
+
       imageInput.addEventListener('change', handleImageUpload);
       imageReplaceInput.addEventListener('change', handleImageUpload);
       btnRemoveImage.addEventListener('click', removeImage);
@@ -457,6 +510,22 @@
       initAISegmentation();
       initInteractionEngine();
     });
+
+    function updateAnimSpeed(val) {
+      state.animDurationPerLayer = val;
+      const secStr = `${(val / 1000).toFixed(1)}s`;
+
+      animSpeedInputMain.value = val;
+      animSpeedValMain.textContent = secStr;
+
+      animSpeedInputModal.value = val;
+      animSpeedValModal.textContent = secStr;
+
+      // 若 Modal 正開啟中，調整速度時自動重播
+      if (!document.getElementById('previewModal').classList.contains('hidden') && !isRecording) {
+        triggerAnimationPlay();
+      }
+    }
 
     function cloneCanvas(sourceCanvas) {
       const c = document.createElement('canvas');
@@ -1260,7 +1329,6 @@
       ctx.restore();
     }
 
-    // 完美修正景深繪製管線 (Pipeline)：從最深處 (最後一個文字層) 往前繪製
     function renderMultiLayerAnimationFrame(globalProgress) {
       const pCanvas = document.getElementById('previewCanvas');
       const ctx = pCanvas.getContext('2d');
@@ -1277,8 +1345,7 @@
         drawImgObjectCover(ctx, state.currentImgElement, targetWidth, targetHeight);
       }
 
-      // 2. 從後往前繪製（文字層 N 繪製在最底層，文字層 1 繪製在最前層）
-      // 這樣前面的文字與主體蓋在上方時，不會有透明背景把前面已繪製好的文字擦除截斷！
+      // 2. 從後往前遞進繪製，確保層級遮擋關係正角
       for (let idx = state.textLayers.length - 1; idx >= 0; idx--) {
         const layer = state.textLayers[idx];
         const layerProgress = computeSequentialProgress(globalProgress, idx, state.textLayers.length);
@@ -1309,7 +1376,8 @@
       return (globalProgress - startTime) / layerDuration;
     }
 
-    function startCanvasAnimation(durationPerLayer = 1000) {
+    // 使用 State 中的 animDurationPerLayer 控制播放速度
+    function startCanvasAnimation() {
       if (animReqId) cancelAnimationFrame(animReqId);
 
       if (subjectCanvasList[state.activeLayerIndex]) {
@@ -1318,7 +1386,8 @@
         activeCtx.drawImage(layerTopSubject, 0, 0);
       }
 
-      const totalDuration = Math.max(1200, state.textLayers.length * durationPerLayer);
+      const durationPerLayer = state.animDurationPerLayer;
+      const totalDuration = Math.max(1000, state.textLayers.length * durationPerLayer);
       const startTime = performance.now();
 
       function step(now) {
@@ -1338,7 +1407,7 @@
     }
 
     function triggerAnimationPlay() {
-      startCanvasAnimation(1000);
+      startCanvasAnimation();
     }
 
     async function openPreviewModal() {
@@ -1541,6 +1610,7 @@
         }
       ];
       state.activeLayerIndex = 0;
+      updateAnimSpeed(1000);
       renderLayerTabs();
       syncUIFromActiveLayer();
       renderAllTextLayersDOM();
