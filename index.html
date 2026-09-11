@@ -5,14 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>𓃥 白六照片主題編輯</title>
 
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Noto+Serif+TC:wght@700;900&family=Zhi+Mang+Xing&family=Dela+Gothic+One&display=swap" rel="stylesheet">
 
+  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
+  <!-- Canvas Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
+  <!-- MediaPipe Selfie Segmentation -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
 
   <script>
@@ -75,6 +80,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
 
+  <!-- Header -->
   <header class="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
     <div class="flex items-center gap-2">
       <span class="text-xl font-bold bg-gradient-to-r from-brand-300 to-amber-200 bg-clip-text text-transparent flex items-center gap-1.5">
@@ -94,12 +100,16 @@
     </div>
   </header>
 
+  <!-- 主編輯區 -->
   <main class="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center justify-start gap-4">
 
+    <!-- 3D 景深卡片舞台 -->
     <div id="cardContainer" class="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-all duration-300">
       
+      <!-- Stage -->
       <div id="stageContainer" class="relative bg-slate-950 w-full aspect-square overflow-hidden group touch-none">
         
+        <!-- 上傳與貼上區 (空狀態) -->
         <div id="uploadPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center z-50">
           <label class="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-brand-300 shadow-inner cursor-pointer hover:bg-slate-700 transition active:scale-95">
             <i data-lucide="image-plus" class="w-7 h-7"></i>
@@ -111,27 +121,34 @@
             <p class="text-xs text-slate-500 mt-1">支援多層動態文字穿透與畫布錄影</p>
           </div>
 
+          <!-- 剪貼板貼上按鈕 -->
           <button onclick="pasteFromClipboard()" class="mt-1 flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-brand-300 font-medium text-xs rounded-xl shadow-md active:scale-95 transition">
             <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
             <span>從剪貼板貼上</span>
           </button>
         </div>
 
+        <!-- AI 運算處理中遮罩 -->
         <div id="aiLoadingMask" class="absolute inset-0 bg-slate-950/80 backdrop-blur-md hidden flex-col items-center justify-center gap-3 z-50">
           <div class="w-10 h-10 border-4 border-brand-300/20 border-t-brand-300 rounded-full animate-spin"></div>
           <p class="text-xs font-semibold text-brand-300">AI 正自動預判主體圖層中...</p>
         </div>
 
+        <!-- 【圖層 3：最底層】原始照片背景 (z-index: 0) -->
         <img id="layerBottom" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none z-0" alt="Full Image" />
 
+        <!-- 【圖層 2：多層文字動態 DOM 容器】 (z-index: 10) -->
         <div id="multiTextDomContainer" class="absolute inset-0 pointer-events-none z-10"></div>
 
+        <!-- 【圖層 1：當前可編輯前景主體 Canvas】 (z-index: 20) -->
         <canvas id="layerTopSubject" class="absolute inset-0 w-full h-full object-cover hidden z-20"></canvas>
 
+        <!-- 筆刷觸控指示器 -->
         <div id="brushCursor" class="absolute hidden rounded-full border-2 border-dashed border-yellow-300 bg-red-500/30 shadow-lg z-30 flex items-center justify-center transition-all duration-75">
           <div class="w-2 h-2 rounded-full bg-yellow-400"></div>
         </div>
 
+        <!-- 圖片控制項 -->
         <div id="imageOverlayControls" class="absolute top-3 left-3 hidden flex-col gap-2 z-40">
           <label class="p-2 rounded-xl bg-slate-900/80 backdrop-blur-md text-slate-200 hover:bg-slate-800 cursor-pointer shadow-lg border border-slate-700/50 active:scale-90 transition">
             <i data-lucide="refresh-cw" class="w-4 h-4"></i>
@@ -142,6 +159,7 @@
           </button>
         </div>
 
+        <!-- 提示標籤 -->
         <div id="eraserBadge" class="absolute top-3 right-3 hidden items-center gap-1.5 px-3 py-1 bg-red-500 text-white font-bold text-xs rounded-full shadow-lg backdrop-blur-md z-40 animate-pulse">
           <i id="modeBadgeIcon" data-lucide="eraser" class="w-3.5 h-3.5"></i>
           <span id="modeBadgeText">橡皮擦：擦除區域露出文字</span>
@@ -149,11 +167,14 @@
 
       </div>
 
+      <!-- 操作選單 -->
       <div class="px-4 py-3 bg-slate-950/90 border-t border-slate-800 flex flex-col gap-2.5">
         
+        <!-- 多文字圖層頁籤列表 -->
         <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
           <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar" id="textLayerTabs">
-            </div>
+            <!-- 頁籤透過 JavaScript 動態渲染 -->
+          </div>
 
           <button onclick="addNewTextLayer()" class="px-2.5 py-1 bg-brand-300/10 hover:bg-brand-300/20 text-brand-300 border border-brand-300/30 text-xs font-semibold rounded-lg shrink-0 active:scale-95 transition flex items-center gap-1">
             <i data-lucide="plus" class="w-3.5 h-3.5"></i>
@@ -161,6 +182,7 @@
           </button>
         </div>
 
+        <!-- 模式切換按鈕 -->
         <div class="grid grid-cols-4 gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
           <button id="btnModeMove" onclick="setInteractionMode('move')" class="py-1.5 text-[11px] font-semibold rounded-lg bg-brand-300 text-slate-950 flex items-center justify-center gap-1 transition">
             <i data-lucide="move" class="w-3.5 h-3.5"></i> 文字移動
@@ -179,6 +201,7 @@
           </button>
         </div>
 
+        <!-- 筆刷大小 bar -->
         <div id="brushSizeBar" class="flex items-center gap-3 px-1 py-1 bg-slate-900/60 rounded-xl border border-slate-800">
           <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
             <i data-lucide="circle-dot" class="w-3.5 h-3.5 text-brand-300"></i> 接觸面積
@@ -194,6 +217,7 @@
           <span id="brushSizeVal" class="text-xs font-mono text-brand-300 shrink-0 w-8 text-right">30px</span>
         </div>
 
+        <!-- 當前圖層設定項 -->
         <div class="flex items-center gap-2">
           <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
             <i data-lucide="edit-3" class="w-3.5 h-3.5 text-brand-300"></i> 文字
@@ -207,6 +231,7 @@
           />
         </div>
 
+        <!-- 進場方式與主體層關係 -->
         <div class="grid grid-cols-2 gap-2">
           <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2 py-1">
             <span class="text-[11px] text-slate-400 shrink-0">進場：</span>
@@ -226,6 +251,7 @@
           </button>
         </div>
 
+        <!-- 字型選擇 -->
         <div class="flex items-center gap-2">
           <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
             <i data-lucide="type" class="w-3.5 h-3.5 text-brand-300"></i> 字型
@@ -238,6 +264,7 @@
           </div>
         </div>
 
+        <!-- 顏色選擇 -->
         <div class="flex items-center gap-2">
           <span class="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
             <i data-lucide="palette" class="w-3.5 h-3.5 text-brand-300"></i> 顏色
@@ -269,6 +296,7 @@
 
   </main>
 
+  <!-- 底部選單 -->
   <div class="sticky bottom-0 z-30 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-4 py-3">
     <div class="w-full max-w-sm mx-auto flex items-center justify-around gap-2">
       
@@ -290,6 +318,7 @@
     </div>
   </div>
 
+  <!-- 【預覽成果與動態錄影 Modal】 -->
   <div id="previewModal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex flex-col items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-3">
       <div class="flex items-center justify-between">
@@ -301,6 +330,7 @@
         </button>
       </div>
 
+      <!-- 播放控制與錄影 -->
       <div class="flex items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
         <button onclick="triggerAnimationPlay()" class="px-3.5 py-1.5 bg-brand-300 hover:bg-brand-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shadow-md active:scale-95 transition flex-1 justify-center">
           <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
@@ -313,10 +343,12 @@
         </button>
       </div>
 
+      <!-- Canvas 預覽畫布 -->
       <div id="previewCanvasBox" class="w-full rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner relative">
         <canvas id="previewCanvas" class="w-full h-full object-contain"></canvas>
       </div>
 
+      <!-- 快捷匯出操作列（複製 / 分享與儲存） -->
       <div class="grid grid-cols-2 gap-2 pt-1">
         <button onclick="copyToClipboard()" class="py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition active:scale-95 flex items-center justify-center gap-1">
           <i data-lucide="copy" class="w-3.5 h-3.5 text-cyan-300"></i>
@@ -331,10 +363,10 @@
     </div>
   </div>
 
+  <!-- 離屏備份 Canvas：備份 AI 最初乾淨的主體圖層 -->
   <canvas id="originalSubjectCanvas" class="hidden"></canvas>
 
   <script>
-    // 全域多圖層狀態
     const state = {
       currentImgElement: null,
       aspectRatio: '1:1',
@@ -343,7 +375,6 @@
       currentMode: 'move',
       brushSize: 30,
       
-      // 多文字圖層陣列
       textLayers: [
         {
           id: 1,
@@ -361,6 +392,8 @@
       ],
       activeLayerIndex: 0
     };
+
+    const subjectCanvasList = [];
 
     const fontMap = {
       'font-sans': '"Noto Sans TC", sans-serif',
@@ -425,7 +458,15 @@
       initInteractionEngine();
     });
 
-    // 渲染圖層頁籤列表
+    function cloneCanvas(sourceCanvas) {
+      const c = document.createElement('canvas');
+      c.width = sourceCanvas.width;
+      c.height = sourceCanvas.height;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(sourceCanvas, 0, 0);
+      return c;
+    }
+
     function renderLayerTabs() {
       const tabsBox = document.getElementById('textLayerTabs');
       tabsBox.innerHTML = '';
@@ -458,7 +499,6 @@
       charCount.textContent = `${state.textLayers.length} 個文字圖層`;
     }
 
-    // 動態在舞台上渲染所有文字圖層
     function renderAllTextLayersDOM() {
       multiTextDomContainer.innerHTML = '';
 
@@ -522,8 +562,13 @@
       }
     }
 
-    // 新增文字圖層（新文層獨立使用最初的 AI 主體去背）
     function addNewTextLayer() {
+      if (subjectCanvasList[state.activeLayerIndex]) {
+        const activeCtx = subjectCanvasList[state.activeLayerIndex].getContext('2d');
+        activeCtx.clearRect(0, 0, layerTopSubject.width, layerTopSubject.height);
+        activeCtx.drawImage(layerTopSubject, 0, 0);
+      }
+
       const newId = Date.now();
       const offset = (state.textLayers.length % 5) * 22;
 
@@ -538,39 +583,65 @@
         top: 25 + offset,
         width: 160,
         animType: 'bottom',
-        belowSubject: true // 預設使用最初判定的 AI 主體層景深穿透
+        belowSubject: true
       });
 
+      const newSubjectCanvas = cloneCanvas(originalSubjectCanvas);
+      subjectCanvasList.push(newSubjectCanvas);
+
       state.activeLayerIndex = state.textLayers.length - 1;
+
+      const stageCtx = layerTopSubject.getContext('2d');
+      stageCtx.clearRect(0, 0, layerTopSubject.width, layerTopSubject.height);
+      stageCtx.drawImage(newSubjectCanvas, 0, 0);
+
       renderLayerTabs();
       syncUIFromActiveLayer();
       renderAllTextLayersDOM();
     }
 
-    // 刪除指定文字層
     function deleteTextLayer(e, index) {
       e.stopPropagation();
       if (state.textLayers.length <= 1) return;
 
       state.textLayers.splice(index, 1);
+      subjectCanvasList.splice(index, 1);
+
       if (state.activeLayerIndex >= state.textLayers.length) {
         state.activeLayerIndex = state.textLayers.length - 1;
       }
 
+      const curSubject = subjectCanvasList[state.activeLayerIndex] || originalSubjectCanvas;
+      const stageCtx = layerTopSubject.getContext('2d');
+      stageCtx.clearRect(0, 0, layerTopSubject.width, layerTopSubject.height);
+      stageCtx.drawImage(curSubject, 0, 0);
+
       renderLayerTabs();
       syncUIFromActiveLayer();
       renderAllTextLayersDOM();
     }
 
-    // 切換當前作用圖層
     function switchActiveLayer(index) {
+      if (index === state.activeLayerIndex) return;
+
+      if (subjectCanvasList[state.activeLayerIndex]) {
+        const activeCtx = subjectCanvasList[state.activeLayerIndex].getContext('2d');
+        activeCtx.clearRect(0, 0, layerTopSubject.width, layerTopSubject.height);
+        activeCtx.drawImage(layerTopSubject, 0, 0);
+      }
+
       state.activeLayerIndex = index;
+
+      const curSubject = subjectCanvasList[index] || originalSubjectCanvas;
+      const stageCtx = layerTopSubject.getContext('2d');
+      stageCtx.clearRect(0, 0, layerTopSubject.width, layerTopSubject.height);
+      stageCtx.drawImage(curSubject, 0, 0);
+
       renderLayerTabs();
       syncUIFromActiveLayer();
       renderAllTextLayersDOM();
     }
 
-    // 同步當前層 State 回控制選單
     function syncUIFromActiveLayer() {
       const cur = state.textLayers[state.activeLayerIndex];
       if (!cur) return;
@@ -809,7 +880,6 @@
       canvasSubject.width = w;
       canvasSubject.height = h;
 
-      // 設定備份 Canvas 大小
       originalSubjectCanvas.width = w;
       originalSubjectCanvas.height = h;
       const ctxOrig = originalSubjectCanvas.getContext('2d');
@@ -823,9 +893,13 @@
           drawImgObjectCover(ctxSub, img, w, h);
           ctxSub.restore();
 
-          // 備份一份最初 AI 判定完成的主體畫布，確保後續新文層不受橡皮擦塗抹影響
           ctxOrig.clearRect(0, 0, w, h);
           ctxOrig.drawImage(canvasSubject, 0, 0);
+
+          subjectCanvasList.length = 0;
+          state.textLayers.forEach(() => {
+            subjectCanvasList.push(cloneCanvas(originalSubjectCanvas));
+          });
 
           aiMask.classList.add('hidden');
           aiMask.classList.remove('flex');
@@ -845,6 +919,11 @@
         drawImgObjectCover(ctxSub, img, w, h);
         ctxOrig.clearRect(0, 0, w, h);
         ctxOrig.drawImage(canvasSubject, 0, 0);
+
+        subjectCanvasList.length = 0;
+        state.textLayers.forEach(() => {
+          subjectCanvasList.push(cloneCanvas(originalSubjectCanvas));
+        });
 
         aiMask.classList.add('hidden');
         toggleHighlightOverlay();
@@ -1110,9 +1189,8 @@
       return lines;
     }
 
-    // 單一文字圖層繪製邏輯
     function drawSingleTextLayer(ctx, layer, progress, targetWidth, targetHeight, stageRect) {
-      if (progress <= 0) return; // 尚未輪到該層動畫時不繪製，確保依序登場
+      if (progress <= 0) return;
 
       const scaleFactor = targetWidth / stageRect.width;
       
@@ -1182,7 +1260,7 @@
       ctx.restore();
     }
 
-    // 多圖層獨立景深渲染（新文層一律使用最初 AI 判定的完整主體層，不受前一文層修飾影響）
+    // 完美修正景深繪製管線 (Pipeline)：從最深處 (最後一個文字層) 往前繪製
     function renderMultiLayerAnimationFrame(globalProgress) {
       const pCanvas = document.getElementById('previewCanvas');
       const ctx = pCanvas.getContext('2d');
@@ -1194,28 +1272,30 @@
       pCanvas.width = targetWidth;
       pCanvas.height = targetHeight;
 
-      // 1. 繪製最底層原始照片背景
+      // 1. 最底層：原始照片背景
       if (state.currentImgElement) {
         drawImgObjectCover(ctx, state.currentImgElement, targetWidth, targetHeight);
       }
 
-      // 2. 依序處理每個文字圖層
-      state.textLayers.forEach((layer, idx) => {
+      // 2. 從後往前繪製（文字層 N 繪製在最底層，文字層 1 繪製在最前層）
+      // 這樣前面的文字與主體蓋在上方時，不會有透明背景把前面已繪製好的文字擦除截斷！
+      for (let idx = state.textLayers.length - 1; idx >= 0; idx--) {
+        const layer = state.textLayers[idx];
         const layerProgress = computeSequentialProgress(globalProgress, idx, state.textLayers.length);
 
-        // 先繪製文字層
+        // A. 繪製該層文字
         drawSingleTextLayer(ctx, layer, layerProgress, targetWidth, targetHeight, stageRect);
 
-        // 若該文字層開啟「景深穿透」，且動畫已開始展現
+        // B. 繪製該文字層對應的主體遮罩（蓋在文字上方，形成穿透）
         if (state.isDepthOn && layer.belowSubject && layerProgress > 0) {
-          // 判定：若該文字層是「當前正在被橡皮擦編輯的層」，使用編輯中的 Canvas；否則使用最初 AI 判定的乾淨主體備份
-          const subjectSource = (idx === state.activeLayerIndex) ? layerTopSubject : originalSubjectCanvas;
-          ctx.drawImage(subjectSource, 0, 0, targetWidth, targetHeight);
+          let layerSubject = (idx === state.activeLayerIndex) ? layerTopSubject : subjectCanvasList[idx];
+          if (!layerSubject) layerSubject = originalSubjectCanvas;
+
+          ctx.drawImage(layerSubject, 0, 0, targetWidth, targetHeight);
         }
-      });
+      }
     }
 
-    // 嚴格接續式時間軸算法：確保前一層完全到位後再啟動下一個
     function computeSequentialProgress(globalProgress, index, total) {
       if (total <= 1) return globalProgress;
       
@@ -1231,6 +1311,12 @@
 
     function startCanvasAnimation(durationPerLayer = 1000) {
       if (animReqId) cancelAnimationFrame(animReqId);
+
+      if (subjectCanvasList[state.activeLayerIndex]) {
+        const activeCtx = subjectCanvasList[state.activeLayerIndex].getContext('2d');
+        activeCtx.clearRect(0, 0, layerTopSubject.width, layerTopSubject.height);
+        activeCtx.drawImage(layerTopSubject, 0, 0);
+      }
 
       const totalDuration = Math.max(1200, state.textLayers.length * durationPerLayer);
       const startTime = performance.now();
@@ -1282,7 +1368,6 @@
       document.getElementById('previewModal').classList.add('hidden');
     }
 
-    // Canvas 畫布錄影功能 (MediaRecorder API)
     function toggleScreenRecord() {
       if (isRecording) {
         stopScreenRecord();
@@ -1439,6 +1524,7 @@
 
     function resetAll() {
       removeImage();
+      subjectCanvasList.length = 0;
       state.textLayers = [
         {
           id: Date.now(),
